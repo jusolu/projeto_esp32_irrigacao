@@ -87,13 +87,21 @@ void loop() {
 // =============================================================================
 
 void conectarWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
   Serial.print("Conectando ao Wi-Fi: ");
   Serial.println(WIFI_SSID);
+
+  // Reseta o módulo Wi-Fi para evitar o erro 'wifi:sta is connecting, cannot set config'
+  WiFi.disconnect(true);
+  delay(200);
+
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 25) {
     delay(500);
     Serial.print(".");
     tentativas++;
@@ -110,6 +118,8 @@ void conectarWiFi() {
 
 int lerUmidadeSoloPercentual(int &rawAnalog) {
   rawAnalog = analogRead(PIN_SOIL_ANALOG);
+  if (rawAnalog <= 0) return 0; // Sensor desconectado (ADC 0)
+  
   // Mapeia valor analógico para 0 - 100%
   int pct = map(rawAnalog, ADC_SOLO_SECO, ADC_SOLO_MOLHADO, 0, 100);
   return constrain(pct, 0, 100);
@@ -117,9 +127,10 @@ int lerUmidadeSoloPercentual(int &rawAnalog) {
 
 float lerTensaoBateria() {
   int rawBat = analogRead(PIN_BATTERY);
+  if (rawBat <= 0) return 0.0; // Pinos desconectados retornam 0.0V
+  
   // Leitura ADC de 3.3V com divisor de tensão
   float volts = (rawBat / 4095.0) * 3.3 * 2.0; 
-  if (volts < 0.1) volts = 4.12; // Valor simulado caso pino esteja desconectado
   return volts;
 }
 
@@ -146,8 +157,8 @@ void executarCicloTelemetriaEControle() {
   float hum  = dht.readHumidity();
   float vBat = lerTensaoBateria();
 
-  if (isnan(temp)) temp = 25.0; // Fallback caso ocorra falha de leitura pontual
-  if (isnan(hum))  hum  = 60.0;
+  if (isnan(temp)) temp = 0.0; // Se o sensor DHT não estiver ligado, retorna 0.0
+  if (isnan(hum))  hum  = 0.0;
 
   Serial.println("\n--- [Leitura dos Sensores] ---");
   Serial.printf("Umidade do Solo: %d%% (RAW ADC: %d)\n", umidadeSoloPct, rawSoil);
