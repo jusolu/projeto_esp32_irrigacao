@@ -1,7 +1,7 @@
 #include <WiFi.h>
 
-const char* ssid     = "AP104-2.4G";
-const char* password = "papagaio";
+const char* ssid     = "ACERJS 9417";  // Hotspot do notebook
+const char* password = "149oF8@3";
 
 void setup() {
   Serial.begin(115200);
@@ -42,14 +42,13 @@ void setup() {
   Serial.printf("   Senha: '%s'\n", password);
 
   WiFi.persistent(false);
-  WiFi.disconnect(true);
-  delay(300);
+  WiFi.disconnect(true, true); // apaga credenciais salvas
+  delay(500);
 
-  WiFi.setSleep(false);
-  WiFi.setAutoReconnect(true);
-
-  // Garantia explícita do modo estação ativo antes de iniciar a conexão
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(false); // desliga ANTES de conectar para evitar conflito
+  WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
   WiFi.begin(ssid, password);
 
   int tentativas = 0;
