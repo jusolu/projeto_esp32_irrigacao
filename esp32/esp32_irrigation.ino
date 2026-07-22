@@ -19,8 +19,8 @@
 // =============================================================================
 // 1. CONFIGURAÇÕES DE REDE E SERVIDOR
 // =============================================================================
-const char* WIFI_SSID     = "ACERJS 9417";
-const char* WIFI_PASSWORD = "149oF8@3";
+const char* WIFI_SSID     = "AP104-2.4G";
+const char* WIFI_PASSWORD = "papagaio";
 
 // URL de produção do seu servidor Vercel:
 const char* VERCEL_API_URL = "https://projeto-esp32-irrigacao.vercel.app/api/esp32";

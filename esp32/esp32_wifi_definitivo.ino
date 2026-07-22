@@ -4,8 +4,8 @@
 // CÓDIGO DEFINITIVO DE CONEXÃO WI-FI PARA ESP32 (ARDUINO IDE)
 // ============================================================
 
-const char* ssid     = "ACERJS 9417";
-const char* password = "149oF8@3";
+const char* ssid     = "AP104-2.4G";
+const char* password = "papagaio";
 
 void setup() {
   Serial.begin(115200);
