@@ -17,10 +17,8 @@
 #include <ArduinoJson.h> // Instalar biblioteca ArduinoJson via Library Manager
 #include <DHT.h>
 
-// Credenciais Wi-Fi configuradas:
-// NOTA IMPORTANTE: O ESP32 necessita de sinal na frequência 2.4 GHz.
-// Se a sua rede 'AP104-5G' for exclusiva de 5 GHz, utilize o nome da rede 2.4 GHz do seu roteador (ex: 'AP104').
-const char* WIFI_SSID     = "AP104-5G";
+// Credenciais Wi-Fi configuradas para 2.4 GHz (Compatível com ESP32):
+const char* WIFI_SSID     = "AP104-2.4G";
 const char* WIFI_PASSWORD = "papagaio";
 
 // URL de produção do seu servidor Vercel:
