@@ -17,11 +17,11 @@
 #include <ArduinoJson.h> // Instalar biblioteca ArduinoJson via Library Manager
 #include <DHT.h>
 
-// =============================================================================
-// 1. CONFIGURAÇÕES DE REDE E SERVIDOR
-// =============================================================================
-const char* WIFI_SSID     = "SUA_REDE_WIFI";
-const char* WIFI_PASSWORD = "SUA_SENHA_WIFI";
+// Credenciais Wi-Fi configuradas:
+// NOTA IMPORTANTE: O ESP32 necessita de sinal na frequência 2.4 GHz.
+// Se a sua rede 'AP104-5G' for exclusiva de 5 GHz, utilize o nome da rede 2.4 GHz do seu roteador (ex: 'AP104').
+const char* WIFI_SSID     = "AP104-5G";
+const char* WIFI_PASSWORD = "papagaio";
 
 // URL de produção do seu servidor Vercel:
 const char* VERCEL_API_URL = "https://projeto-esp32-irrigacao.vercel.app/api/esp32";
