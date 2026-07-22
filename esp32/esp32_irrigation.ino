@@ -103,12 +103,12 @@ void conectarWiFi() {
   WiFi.disconnect(true);
   delay(300);
 
-  WiFi.mode(WIFI_STA);
   WiFi.setSleep(false); // Desativa economia de energia no rádio Wi-Fi
   WiFi.setTxPower(WIFI_POWER_19_5dBm); // Potência máxima de transmissão do antena do ESP32
   WiFi.setAutoReconnect(true);
 
-  // Permite busca automática em todos os canais de 2.4GHz (1-13)
+  // Garantia explícita do modo estação ativo antes de conectar
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tentativas = 0;

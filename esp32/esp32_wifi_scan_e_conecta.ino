@@ -45,10 +45,11 @@ void setup() {
   WiFi.disconnect(true);
   delay(300);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false); // Desativa economia de energia do rádio Wi-Fi
+  WiFi.setSleep(false);
   WiFi.setAutoReconnect(true);
 
+  // Garantia explícita do modo estação ativo antes de iniciar a conexão
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
   int tentativas = 0;
