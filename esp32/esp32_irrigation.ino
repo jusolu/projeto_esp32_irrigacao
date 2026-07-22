@@ -7,7 +7,6 @@
   - Módulo Relé (1 Canal) -> Aciona Mini Bomba D'água
   - Sensor de Umidade do Solo Capacitivo v1.2
   - Sensor DHT22 (ou DHT11) -> Temp & Umidade do Ar
-  - Módulo RTC (DS3231 / DS1307) -> I2C
   - Suporte 4x Baterias 18650 + Painel Solar
   =============================================================================
 */
@@ -17,8 +16,6 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h> // Instalar biblioteca ArduinoJson via Library Manager
 #include <DHT.h>
-#include <Wire.h>
-#include <RTClib.h>     // Instalar biblioteca RTClib da Adafruit
 
 // =============================================================================
 // 1. CONFIGURAÇÕES DE REDE E SERVIDOR
@@ -50,7 +47,6 @@ const int ADC_SOLO_MOLHADO = 1200; // Leitura do sensor imerso na ÁGUA (100%)
 // 3. OBJETOS E VARIÁVEIS GLOBAIS
 // =============================================================================
 DHT dht(PIN_DHT, DHTTYPE);
-RTC_DS3231 rtc; // Ou RTC_DS1307 dependendo do seu módulo RTC
 
 unsigned long ultimaChecagem = 0;
 
@@ -69,13 +65,6 @@ void setup() {
 
   // Inicializa sensores
   dht.begin();
-  
-  Wire.begin(21, 22); // SDA = GPIO 21, SCL = GPIO 22 para o módulo RTC
-  if (!rtc.begin()) {
-    Serial.println("⚠️ Módulo RTC não encontrado via I2C!");
-  } else {
-    Serial.println("✅ RTC DS3231 Conectado!");
-  }
 
   // Conexão Wi-Fi
   conectarWiFi();
