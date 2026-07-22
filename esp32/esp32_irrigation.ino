@@ -19,8 +19,8 @@
 // =============================================================================
 // 1. CONFIGURAÇÕES DE REDE E SERVIDOR
 // =============================================================================
-const char* WIFI_SSID     = "AP104-2.4G";
-const char* WIFI_PASSWORD = "papagaio";
+const char* WIFI_SSID     = "ACERJS 9417";
+const char* WIFI_PASSWORD = "149oF8@3";
 
 // URL de produção do seu servidor Vercel:
 const char* VERCEL_API_URL = "https://projeto-esp32-irrigacao.vercel.app/api/esp32";
@@ -89,41 +89,28 @@ void loop() {
 void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
 
-  Serial.print("Conectando à rede 2.4GHz: ");
+  Serial.print("Conectando ao Wi-Fi: ");
   Serial.println(WIFI_SSID);
 
-  // Escutador de eventos do Wi-Fi para diagnosticar qualquer falha
-  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
-    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-      Serial.printf("\n⚠️ Desconectado. Motivo (Reason): %d\n", info.wifi_sta_disconnected.reason);
-    }
-  });
-
-  WiFi.persistent(false);
-  WiFi.disconnect(true);
-  delay(300);
-
-  WiFi.setSleep(false); // Desativa economia de energia no rádio Wi-Fi
-  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Potência máxima de transmissão do antena do ESP32
-  WiFi.setAutoReconnect(true);
-
-  // Garantia explícita do modo estação ativo antes de conectar
   WiFi.mode(WIFI_STA);
+  delay(100);
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 40) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 30) {
     delay(500);
     Serial.print(".");
     tentativas++;
   }
 
+  Serial.println();
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ Wi-Fi Conectado com sucesso!");
-    Serial.print("IP do ESP32: ");
-    Serial.println(WiFi.localIP());
+    Serial.println("🎉 CONECTADO COM SUCESSO!");
+    Serial.print("   IP: "); Serial.println(WiFi.localIP());
   } else {
-    Serial.println("\n❌ Falha ao conectar ao Wi-Fi.");
+    Serial.print("❌ Falha na conexão Wi-Fi. Status: ");
+    Serial.println(WiFi.status());
   }
 }
 
