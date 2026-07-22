@@ -1,6 +1,6 @@
 #include <WiFi.h>
 
-const char* ssid     = "AP104-2.4G";
+const char* ssid     = "AP104-5G";
 const char* password = "papagaio";
 
 void setup() {
