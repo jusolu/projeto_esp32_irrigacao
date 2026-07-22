@@ -8,7 +8,7 @@ void setup() {
   delay(1000);
 
   Serial.println("\n=============================================");
-  Serial.println("  ESP32: Scan & Conexão Wi-Fi (Exemplo Simples)");
+  Serial.println("  ESP32: Scan & Conexão Wi-Fi (Fix ScanDelete)");
   Serial.println("=============================================");
 
   // 1. PASSO DE ESCANEAMENTO DAS REDES EM ALCANCE
@@ -31,15 +31,28 @@ void setup() {
     }
   }
 
+  // OBRIGATÓRIO NA DOCUMENTAÇÃO DO ESP32:
+  // Apagar o cache do escaneamento e resetar o rádio antes de chamar WiFi.begin()
+  WiFi.scanDelete();
+  delay(500);
+
   // 2. PASSO DE CONEXÃO COM A SUA REDE
   Serial.println("\n🌐 2. Tentando conectar a:");
   Serial.printf("   SSID:  '%s'\n", ssid);
   Serial.printf("   Senha: '%s'\n", password);
 
+  WiFi.persistent(false);
+  WiFi.disconnect(true);
+  delay(300);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false); // Desativa economia de energia do rádio Wi-Fi
+  WiFi.setAutoReconnect(true);
+
   WiFi.begin(ssid, password);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 30) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 40) {
     delay(500);
     Serial.print(".");
     tentativas++;
