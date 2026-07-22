@@ -3,8 +3,8 @@
 
 // COLOQUE AQUI a senha EXATA da sua rede AP104-2.4G
 // Confirme com alguem que tenha acesso ao roteador
-const char* ssid     = "AP104-2.4G";
-const char* password = "papagaio";
+const char* ssid     = "ACERJS 9417";
+const char* password = "149oF8@3";
 
 void imprimirBytes(const char* label, const char* str) {
   Serial.print(label);
@@ -32,10 +32,10 @@ void setup() {
   imprimirBytes("   SSID:  ", ssid);
   imprimirBytes("   SENHA: ", password);
   
-  // 'papagaio' correto deve ser:
-  // p=70 a=61 p=70 a=61 g=67 a=61 i=69 o=6F
-  Serial.println("   SENHA esperada para 'papagaio':");
-  Serial.println("   70 61 70 61 67 61 69 6F");
+  // '149oF8@3' correto deve ser:
+  // 1=31 4=34 9=39 o=6F F=46 8=38 @=40 3=33
+  Serial.println("   SENHA esperada para '149oF8@3':");
+  Serial.println("   31 34 39 6F 46 38 40 33");
 
   // 2. APAGAR COMPLETAMENTE A NVS DO ESP32 (memória de configuração interna)
   Serial.println("\n[2] Apagando NVS Flash completa do ESP32...");
