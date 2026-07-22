@@ -53,6 +53,13 @@ Siga as instruções na tela (pressione Enter para as opções padrão). A CLI v
 
 ---
 
+## 🌐 URL Oficial em Produção
+
+- **Painel Web**: [https://projeto-esp32-irrigacao.vercel.app/](https://projeto-esp32-irrigacao.vercel.app/)
+- **Endpoint ESP32**: `https://projeto-esp32-irrigacao.vercel.app/api/esp32`
+
+---
+
 ## 🧠 Passo 3: Configurar e gravar o ESP32
 
 1. Abra a [IDE do Arduino](https://www.arduino.cc/en/software).
@@ -64,5 +71,5 @@ Siga as instruções na tela (pressione Enter para as opções padrão). A CLI v
 4. No topo do arquivo `esp32_irrigation.ino`, edite:
    - `WIFI_SSID`: Nome da sua rede Wi-Fi.
    - `WIFI_PASSWORD`: Senha da sua rede Wi-Fi.
-   - `VERCEL_API_URL`: Cole a URL gerada pelo Vercel + `/api/esp32` (ex: `https://seu-projeto.vercel.app/api/esp32`).
+   - `VERCEL_API_URL`: Já configurada com `https://projeto-esp32-irrigacao.vercel.app/api/esp32`.
 5. Conecte o ESP32 na porta USB, selecione a placa **ESP32 Dev Module** e clique em **Upload**!

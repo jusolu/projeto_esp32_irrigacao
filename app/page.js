@@ -299,7 +299,7 @@ export default function Dashboard() {
 
           <div className="guide-box">
             <p><strong>1. Envio de Telemetria e Checagem de Rega (ESP32):</strong></p>
-            <p><code>POST https://seu-projeto.vercel.app/api/esp32</code></p>
+            <p><code>POST https://projeto-esp32-irrigacao.vercel.app/api/esp32</code></p>
             <p style={{ marginTop: '0.5rem' }}><strong>Payload JSON enviado pelo ESP32:</strong></p>
             <code>{'{"soilMoisture": 45, "temperature": 25.4, "humidity": 60, "batteryVoltage": 4.1}'}</code>
             <p style={{ marginTop: '0.5rem' }}><strong>Resposta JSON do Vercel para o ESP32:</strong></p>
