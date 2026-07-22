@@ -89,19 +89,21 @@ void loop() {
 void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
 
-  Serial.print("Conectando ao Wi-Fi: ");
+  Serial.print("Conectando à rede 2.4GHz: ");
   Serial.println(WIFI_SSID);
 
-  // Reseta o módulo Wi-Fi para evitar o erro 'wifi:sta is connecting, cannot set config'
+  // Limpa configurações de Wi-Fi prévias
+  WiFi.persistent(false);
   WiFi.disconnect(true);
-  delay(200);
+  delay(300);
 
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false); // Desativa economia de energia no modem Wi-Fi para evitar desconexões
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 25) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 40) {
     delay(500);
     Serial.print(".");
     tentativas++;
@@ -112,7 +114,7 @@ void conectarWiFi() {
     Serial.print("IP do ESP32: ");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println("\n❌ Falha ao conectar ao Wi-Fi. Tentando no próximo ciclo.");
+    Serial.println("\n❌ Falha ao conectar ao Wi-Fi. Tentando novamente...");
   }
 }
 
