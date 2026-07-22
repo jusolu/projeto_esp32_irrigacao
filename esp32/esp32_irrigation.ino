@@ -1,6 +1,6 @@
 /*
   =============================================================================
-  PROJETO DE IRRIGAÇÃO AUTOMATIZADA ESP32 + SERVIDOR VERCEL
+  PROJETO DE IRRIGAÇÃO AUTOMATIZADA ESP32 + SERVIDOR VERCEL (SEM DEPENDÊNCIAS)
   =============================================================================
   Hardware Utilizado:
   - ESP32 NodeMCU
@@ -14,10 +14,11 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
-#include <ArduinoJson.h> // Instalar biblioteca ArduinoJson via Library Manager
 #include <DHT.h>
 
-// Credenciais Wi-Fi configuradas para 2.4 GHz (Compatível com ESP32):
+// =============================================================================
+// 1. CONFIGURAÇÕES DE REDE E SERVIDOR
+// =============================================================================
 const char* WIFI_SSID     = "AP104-2.4G";
 const char* WIFI_PASSWORD = "papagaio";
 
@@ -162,16 +163,11 @@ void executarCicloTelemetriaEControle() {
     http.begin(client, VERCEL_API_URL);
     http.addHeader("Content-Type", "application/json");
 
-    // Montar JSON de envio
-    StaticJsonDocument<256> docEnvio;
-    docEnvio["soilMoisture"]  = umidadeSoloPct;
-    docEnvio["rawAnalog"]     = rawSoil;
-    docEnvio["temperature"]   = temp;
-    docEnvio["humidity"]      = hum;
-    docEnvio["batteryVoltage"]= vBat;
-
-    String requestBody;
-    serializeJson(docEnvio, requestBody);
+    // Montar JSON nativo (Sem depender de biblioteca externa ArduinoJson)
+    char requestBody[256];
+    snprintf(requestBody, sizeof(requestBody),
+      "{\"soilMoisture\":%d,\"rawAnalog\":%d,\"temperature\":%.1f,\"humidity\":%.1f,\"batteryVoltage\":%.2f}",
+      umidadeSoloPct, rawSoil, temp, hum, vBat);
 
     Serial.println("Enviando telemetria para o Vercel...");
     int httpResponseCode = http.POST(requestBody);
@@ -181,26 +177,19 @@ void executarCicloTelemetriaEControle() {
       Serial.printf("Resposta do Servidor HTTP %d:\n", httpResponseCode);
       Serial.println(response);
 
-      // Parse da resposta do servidor
-      StaticJsonDocument<256> docResposta;
-      DeserializationError err = deserializeJson(docResposta, response);
-
-      if (!err) {
-        bool waterRequested = docResposta["waterRequested"];
-        int durationSec     = docResposta["durationSec"] | 10;
-
-        // Se o painel Web solicitou rega:
-        if (waterRequested) {
-          acionarBombaDagua(durationSec);
-
-          // Notificar o servidor Vercel que a rega foi concluída
-          StaticJsonDocument<128> docConfirmacao;
-          docConfirmacao["waterCompleted"] = true;
-          String confirmBody;
-          serializeJson(docConfirmacao, confirmBody);
-
-          http.POST(confirmBody);
+      // Verifica se o servidor Vercel solicitou rega
+      if (response.indexOf("\"waterRequested\":true") != -1 || response.indexOf("\"waterRequested\": true") != -1) {
+        int durationSec = 10;
+        int idx = response.indexOf("\"durationSec\":");
+        if (idx != -1) {
+          int d = response.substring(idx + 14).toInt();
+          if (d > 0) durationSec = d;
         }
+
+        acionarBombaDagua(durationSec);
+
+        // Notificar o servidor Vercel que a rega foi concluída
+        http.POST("{\"waterCompleted\":true}");
       }
     } else {
       Serial.printf("❌ Erro no envio HTTP: %s\n", http.errorToString(httpResponseCode).c_str());
