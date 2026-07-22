@@ -26,9 +26,8 @@
 const char* WIFI_SSID     = "SUA_REDE_WIFI";
 const char* WIFI_PASSWORD = "SUA_SENHA_WIFI";
 
-// Substitua pela sua URL final do Vercel gerada após o deploy:
-// Exemplo: "https://server-api-esp32.vercel.app/api/esp32"
-const char* VERCEL_API_URL = "https://SEU-PROJETO.vercel.app/api/esp32";
+// URL de produção do seu servidor Vercel:
+const char* VERCEL_API_URL = "https://projeto-esp32-irrigacao.vercel.app/api/esp32";
 
 // =============================================================================
 // 2. PINAGEM DO HARDWARE
