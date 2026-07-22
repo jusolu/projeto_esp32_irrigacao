@@ -95,7 +95,7 @@ void conectarWiFi() {
   // Escutador de eventos do Wi-Fi para diagnosticar qualquer falha
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-      Serial.printf("\n⚠️ Desconectado do Wi-Fi. Código de motivo (Reason): %d\n", info.wifi_sta_disconnected.reason);
+      Serial.printf("\n⚠️ Desconectado. Motivo (Reason): %d\n", info.wifi_sta_disconnected.reason);
     }
   });
 
@@ -105,13 +105,14 @@ void conectarWiFi() {
 
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false); // Desativa economia de energia no rádio Wi-Fi
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Potência máxima de transmissão do antena do ESP32
   WiFi.setAutoReconnect(true);
 
-  // Conecta diretamente no Canal 7 (Canal detectado no escaneamento para AP104-2.4G)
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD, 7);
+  // Permite busca automática em todos os canais de 2.4GHz (1-13)
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 30) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 40) {
     delay(500);
     Serial.print(".");
     tentativas++;
