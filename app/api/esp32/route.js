@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getState, updateTelemetry, clearWateringRequest } from '@/lib/state';
+import { getStateAsync, updateTelemetry, clearWateringRequest, syncToRemote } from '@/lib/state';
 
 // GET /api/esp32 -> O ESP32 pode consultar se precisa acionar a bomba
 export async function GET() {
-  const state = getState();
+  const state = await getStateAsync();
   return NextResponse.json({
     waterRequested: state.waterRequested,
     durationSec: state.durationSec,
@@ -30,7 +30,8 @@ export async function POST(request) {
       rawAnalog: body.rawAnalog
     });
     
-    const state = getState();
+    await syncToRemote();
+    const state = await getStateAsync();
     
     // Resposta para o ESP32 informando se deve regar agora
     return NextResponse.json({

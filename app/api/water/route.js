@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requestWatering, clearWateringRequest, getState } from '@/lib/state';
+import { requestWatering, clearWateringRequest, getStateAsync, syncToRemote } from '@/lib/state';
 
 export async function POST(request) {
   try {
@@ -7,16 +7,20 @@ export async function POST(request) {
     
     if (body.action === 'stop') {
       clearWateringRequest();
-      return NextResponse.json({ success: true, message: 'Rega cancelada.', state: getState() });
+      await syncToRemote();
+      const state = await getStateAsync();
+      return NextResponse.json({ success: true, message: 'Rega cancelada.', state });
     }
     
     const duration = body.durationSec || body.duration || 10;
     requestWatering(duration);
+    await syncToRemote();
+    const state = await getStateAsync();
     
     return NextResponse.json({
       success: true,
       message: `Comando de rega enviado com sucesso (${duration}s)!`,
-      state: getState()
+      state
     });
   } catch (error) {
     return NextResponse.json(
