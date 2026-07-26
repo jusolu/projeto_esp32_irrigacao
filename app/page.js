@@ -43,23 +43,26 @@ export default function Dashboard() {
 
   // Alternar rega (Ativar / Cancelar)
   const handleToggleWater = async () => {
-    if (!status) return;
     setActionLoading(true);
     try {
-      const isWatering = status.waterRequested;
+      const isWatering = status?.waterRequested || false;
+      const action = isWatering ? 'stop' : 'start';
+      console.log(`[DASHBOARD] 🚀 Clicou no Botão Regar! Ação: ${action}, Duração: ${selectedDuration}s`);
+      
       const res = await fetch('/api/water', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: isWatering ? 'stop' : 'start',
+          action: action,
           durationSec: selectedDuration
         })
       });
-      if (res.ok) {
-        await fetchStatus();
-      }
+      const data = await res.json();
+      console.log('[DASHBOARD] ✅ Resposta da API /api/water:', data);
+      
+      await fetchStatus();
     } catch (err) {
-      console.error('Erro ao enviar ação de rega:', err);
+      console.error('[DASHBOARD] ❌ Erro ao enviar ação de rega:', err);
     } finally {
       setActionLoading(false);
     }
