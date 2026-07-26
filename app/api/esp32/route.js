@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStateAsync, updateTelemetry, clearWateringRequest, syncToRemote } from '@/lib/state';
+import { getStateAsync, updateTelemetry, clearWateringRequest } from '@/lib/state';
 
-// GET /api/esp32 -> O ESP32 pode consultar se precisa acionar a bomba
+export const dynamic = 'force-dynamic';
+
+// GET /api/esp32 -> O ESP32 consulta se deve regar
 export async function GET() {
   const state = await getStateAsync();
   return NextResponse.json({
@@ -11,29 +13,27 @@ export async function GET() {
   });
 }
 
-// POST /api/esp32 -> O ESP32 envia dados dos sensores e lê a instrução de rega
+// POST /api/esp32 -> ESP32 envia telemetria e recebe instrução de rega
 export async function POST(request) {
   try {
     const body = await request.json();
-    
-    // Se o ESP32 informou que terminou uma rega
+    console.log('[ESP32] POST recebido:', JSON.stringify(body));
+
+    let state;
     if (body.waterCompleted) {
-      clearWateringRequest();
+      console.log('[ESP32] Rega concluída - limpando request');
+      state = await clearWateringRequest();
+    } else {
+      state = await updateTelemetry({
+        soilMoisture: body.soilMoisture,
+        temperature: body.temperature,
+        humidity: body.humidity,
+        batteryVoltage: body.batteryVoltage,
+        rawAnalog: body.rawAnalog
+      });
     }
-    
-    // Atualiza telemetria dos sensores enviados pelo ESP32
-    updateTelemetry({
-      soilMoisture: body.soilMoisture,
-      temperature: body.temperature,
-      humidity: body.humidity,
-      batteryVoltage: body.batteryVoltage,
-      rawAnalog: body.rawAnalog
-    });
-    
-    await syncToRemote();
-    const state = await getStateAsync();
-    
-    // Resposta para o ESP32 informando se deve regar agora
+
+    console.log('[ESP32] Respondendo waterRequested:', state.waterRequested);
     return NextResponse.json({
       success: true,
       waterRequested: state.waterRequested,
@@ -41,6 +41,7 @@ export async function POST(request) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('[ESP32] Erro:', error.message);
     return NextResponse.json(
       { success: false, error: 'Formato de JSON inválido' },
       { status: 400 }
