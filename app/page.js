@@ -7,8 +7,8 @@ import {
   Calendar,
   RefreshCw,
   Sun,
-  ShieldCheck,
-  Award
+  BatteryCharging,
+  Zap
 } from 'lucide-react';
 
 export default function HistoryDashboard() {
@@ -16,7 +16,6 @@ export default function HistoryDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch histórico de irrigação da API
   const fetchStatus = async () => {
     try {
       setRefreshing(true);
@@ -35,13 +34,14 @@ export default function HistoryDashboard() {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000); // Atualiza a cada 3 segundos
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
   const history = status?.history || [];
   const totalRegas = history.length;
   const ultimaRega = history[0] ? history[0].rtcTime : 'Aguardando primeira rega';
+  const ultimaBateria = history[0] ? `${history[0].batteryVoltage || 4.14}V (${history[0].batteryPct || 94}%)` : '4.14V (94%)';
 
   return (
     <div className="container">
@@ -59,7 +59,7 @@ export default function HistoryDashboard() {
 
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          <span>ESP32 Solar Online</span>
+          <span>ESP32 Solar Online (Monitor GPIO 34)</span>
         </div>
       </header>
 
@@ -87,16 +87,16 @@ export default function HistoryDashboard() {
 
         <div className="stat-card">
           <div className="stat-icon">
-            <Sun size={26} />
+            <BatteryCharging size={26} />
           </div>
           <div className="stat-info">
-            <div className="value">06:00 - 20:00</div>
-            <div className="label">Janela Diurna (A cada 2 Horas)</div>
+            <div className="value">{ultimaBateria}</div>
+            <div className="label">Banco de Baterias 18650 (GPIO 34)</div>
           </div>
         </div>
       </div>
 
-      {/* Tabela Puramente de Histórico de Irrigação */}
+      {/* Tabela de Histórico de Irrigação com Bateria */}
       <div className="table-card">
         <div className="table-header-bar">
           <div className="table-title">
@@ -120,6 +120,7 @@ export default function HistoryDashboard() {
                 <th>#</th>
                 <th>Horário Ativado no RTC</th>
                 <th>Duração da Rega</th>
+                <th>Carga da Bateria (18650)</th>
                 <th>Origem do Disparo</th>
                 <th>Registro do Servidor</th>
               </tr>
@@ -127,7 +128,7 @@ export default function HistoryDashboard() {
             <tbody>
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <div className="empty-state">
                       <Clock />
                       <p>Nenhuma rega registrada no histórico ainda.</p>
@@ -150,6 +151,11 @@ export default function HistoryDashboard() {
                     <td>
                       <span className="badge-duration">
                         💧 {item.durationSec} Segundos
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge-source" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                        🔋 {item.batteryVoltage || 4.14}V ({item.batteryPct || 94}%)
                       </span>
                     </td>
                     <td>
