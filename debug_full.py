@@ -3,77 +3,104 @@ import time
 import urllib.request
 import json
 import threading
+import urllib.parse
 
 HEADERS = {'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}
 WATER_URL = 'https://projeto-esp32-irrigacao.vercel.app/api/water'
 ESP32_URL = 'https://projeto-esp32-irrigacao.vercel.app/api/esp32'
-NPOINT_URL = 'https://api.npoint.io/512b9bf227ca7ffaa3c3'
+REDIS_URL = 'https://on-phoenix-191786.upstash.io'
+REDIS_TOKEN = 'gQAAAAAAAu0qAAIgcDI3YTIyODQzNTQ2NWE0MjdhODExMDQ4NDVhYWQyNmExYw'
 
-def api_call(url, payload=None, method='POST'):
-    data = json.dumps(payload).encode() if payload else None
-    req = urllib.request.Request(url, data=data, headers=HEADERS, method=method)
-    res = urllib.request.urlopen(req, timeout=10)
+def api_post(url, payload):
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=data, headers=HEADERS, method='POST')
+    res = urllib.request.urlopen(req, timeout=15)
     return json.loads(res.read().decode())
 
-def monitor_serial(ser, duration=30):
-    """Lê a serial do ESP32 em tempo real"""
-    start = time.time()
-    while time.time() - start < duration:
-        line = ser.readline().decode('utf-8', errors='ignore')
-        if line.strip():
-            ts = time.strftime('%H:%M:%S')
-            print(f"  [ESP32 {ts}] {line.strip()}")
+def api_get(url):
+    req = urllib.request.Request(url, headers=HEADERS, method='GET')
+    res = urllib.request.urlopen(req, timeout=15)
+    return json.loads(res.read().decode())
 
-def run_debug():
-    print("=" * 60)
-    print("DEBUG COMPLETO: DASHBOARD -> VERCEL -> ESP32")
-    print("=" * 60)
+def redis_get(key):
+    req = urllib.request.Request(f'{REDIS_URL}/get/{key}',
+        headers={'Authorization': f'Bearer {REDIS_TOKEN}'})
+    res = urllib.request.urlopen(req, timeout=10)
+    data = json.loads(res.read().decode())
+    return json.loads(data['result']) if data.get('result') else None
 
-    # 1. Verifica estado atual da Vercel
-    print("\n[1] Verificando /api/status...")
-    status = api_call('https://projeto-esp32-irrigacao.vercel.app/api/status', method='GET')
-    print(f"   waterRequested atual: {status.get('waterRequested')}")
-    print(f"   durationSec atual: {status.get('durationSec')}")
+def ts():
+    return time.strftime('%H:%M:%S')
 
-    # 2. Verifica npoint.io diretamente
-    print("\n[2] Verificando npoint.io (armazenamento persistente)...")
-    npoint_data = api_call(NPOINT_URL, method='GET')
-    print(f"   npoint waterRequested: {npoint_data.get('waterRequested')}")
+def run():
+    print("=" * 65)
+    print("  TESTE COMPLETO: VERCEL REDIS + ESP32 LED")
+    print("=" * 65)
 
-    # 3. Abre serial para monitorar ESP32
-    print("\n[3] Conectando ao ESP32 serial (COM14)...")
+    # Abre serial
     ser = serial.Serial('COM14', 115200, timeout=1)
     ser.dtr = False
     ser.rts = False
-    time.sleep(0.3)
 
-    # Lê alguns ciclos do ESP32 ANTES de acionar
-    print("\n[4] Lendo 2 ciclos do ESP32 ANTES do acionamento:")
-    monitor_serial(ser, duration=6)
+    # Thread que lê o ESP32 em paralelo
+    logs = []
+    stop_flag = [False]
 
-    # 4. Dispara o comando REGAR via /api/water
-    print("\n[5] DISPARANDO REGAR AGORA via /api/water...")
-    water_resp = api_call(WATER_URL, payload={'action': 'start', 'durationSec': 10})
-    print(f"   Vercel /api/water -> waterRequested: {water_resp.get('state', {}).get('waterRequested')}")
+    def read_serial():
+        while not stop_flag[0]:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line:
+                msg = f"  [ESP32 {ts()}] {line}"
+                print(msg)
+                logs.append(msg)
 
-    # 5. Verifica npoint imediatamente após
-    print("\n[6] Verificando npoint.io APÓS o acionamento...")
+    t = threading.Thread(target=read_serial, daemon=True)
+    t.start()
+
+    print(f"\n[{ts()}] PASSO 1: Estado atual no Redis...")
+    state_redis = redis_get('esp32:state')
+    print(f"  Redis waterRequested: {state_redis.get('waterRequested') if state_redis else 'NULO (ainda não inicializado)'}")
+
+    print(f"\n[{ts()}] PASSO 2: Lendo 3 ciclos do ESP32 antes do acionamento...")
+    time.sleep(8)
+
+    print(f"\n[{ts()}] PASSO 3: DISPARANDO /api/water REGAR AGORA...")
+    try:
+        water_resp = api_post(WATER_URL, {'action': 'start', 'durationSec': 10})
+        print(f"  /api/water -> success: {water_resp.get('success')}")
+        print(f"  /api/water -> waterRequested: {water_resp.get('state', {}).get('waterRequested')}")
+    except Exception as e:
+        print(f"  ERRO /api/water: {e}")
+
+    print(f"\n[{ts()}] PASSO 4: Verificando Redis após acionamento...")
     time.sleep(1)
-    npoint_after = api_call(NPOINT_URL, method='GET')
-    print(f"   npoint waterRequested APÓS: {npoint_after.get('waterRequested')}")
+    state_after = redis_get('esp32:state')
+    print(f"  Redis waterRequested APÓS: {state_after.get('waterRequested') if state_after else 'ERRO'}")
 
-    # 6. Simula o que o ESP32 faria ao chamar /api/esp32
-    print("\n[7] Simulando chamada do ESP32 para /api/esp32...")
-    esp32_resp = api_call(ESP32_URL, payload={'soilMoisture': 50, 'temperature': 25, 'humidity': 60, 'batteryVoltage': 4.1})
-    print(f"   /api/esp32 retorna waterRequested: {esp32_resp.get('waterRequested')}")
+    print(f"\n[{ts()}] PASSO 5: Simulando chamada ESP32 a /api/esp32...")
+    try:
+        esp32_resp = api_post(ESP32_URL, {'soilMoisture': 50, 'temperature': 25.0, 'humidity': 60, 'batteryVoltage': 4.1})
+        print(f"  /api/esp32 -> waterRequested: {esp32_resp.get('waterRequested')}")
+        print(f"  /api/esp32 -> durationSec: {esp32_resp.get('durationSec')}")
+    except Exception as e:
+        print(f"  ERRO /api/esp32: {e}")
 
-    # 7. Monitora o ESP32 por 25s esperando ele receber o comando
-    print("\n[8] Monitorando ESP32 serial por 25s (aguardando resposta do LED):")
-    monitor_serial(ser, duration=25)
+    print(f"\n[{ts()}] PASSO 6: Aguardando ESP32 físico responder (25s)...")
+    time.sleep(25)
 
+    stop_flag[0] = True
     ser.close()
-    print("\n" + "=" * 60)
-    print("DEBUG CONCLUIDO")
+
+    print("\n" + "=" * 65)
+    print("  RESULTADO FINAL")
+    print("=" * 65)
+    water_lines = [l for l in logs if 'waterRequested' in l or 'LED' in l or 'REGA' in l or 'ERRO' in l]
+    if water_lines:
+        for l in water_lines:
+            print(l)
+    else:
+        print("  Nenhum log de rega/LED capturado do ESP32.")
+    print("=" * 65)
 
 if __name__ == '__main__':
-    run_debug()
+    run()

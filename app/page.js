@@ -3,311 +3,243 @@
 import { useState, useEffect } from 'react';
 import {
   Droplets,
-  Thermometer,
-  Wind,
-  BatteryCharging,
-  Power,
-  RefreshCw,
   Clock,
-  Activity,
-  CheckCircle2,
-  AlertCircle
+  Calendar,
+  Zap,
+  RefreshCw,
+  Trash2,
+  Play,
+  Sun,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 
-export default function Dashboard() {
+export default function IrrigationDashboard() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [selectedDuration, setSelectedDuration] = useState(10);
+  const [selectedDuration, setSelectedDuration] = useState(15);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch status da API
+  // Fetch status e histórico completo da API
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/status');
+      setRefreshing(true);
+      const res = await fetch('/api/status', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
       }
     } catch (err) {
-      console.error('Erro ao buscar status:', err);
+      console.error('Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
+      setTimeout(() => setRefreshing(false), 500);
     }
   };
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 2500); // Polling a cada 2.5s
+    const interval = setInterval(fetchStatus, 3000); // Polling a cada 3s
     return () => clearInterval(interval);
   }, []);
 
-  // Alternar rega (Ativar / Cancelar)
-  const handleToggleWater = async () => {
+  // Solicita rega manual de teste
+  const handleTriggerWatering = async () => {
     setActionLoading(true);
     try {
-      const isWatering = status?.waterRequested || false;
-      const action = isWatering ? 'stop' : 'start';
-      console.log(`[DASHBOARD] 🚀 Clicou no Botão Regar! Ação: ${action}, Duração: ${selectedDuration}s`);
-      
       const res = await fetch('/api/water', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: action,
+          action: 'start',
           durationSec: selectedDuration
         })
       });
-      const data = await res.json();
-      console.log('[DASHBOARD] ✅ Resposta da API /api/water:', data);
-      
-      await fetchStatus();
+      if (res.ok) {
+        await fetchStatus();
+      }
     } catch (err) {
-      console.error('[DASHBOARD] ❌ Erro ao enviar ação de rega:', err);
+      console.error('Erro ao acionar rega:', err);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Formatação de data/hora
-  const formatTime = (isoString) => {
-    if (!isoString) return 'Sem registro';
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  // Limpa o histórico de regas
+  const handleClearHistory = async () => {
+    if (!confirm('Deseja realmente limpar todo o histórico de irrigação?')) return;
+    try {
+      await fetch('/api/water', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear_history' })
+      });
+      await fetchStatus();
+    } catch (err) {
+      console.error('Erro ao limpar histórico:', err);
+    }
   };
 
-  const telemetry = status?.telemetry || {
-    soilMoisture: 0,
-    temperature: 0,
-    humidity: 0,
-    batteryVoltage: 0,
-    updatedAt: null
-  };
-
-  // Cálculo percentual bateria (considerando célula 18650 entre 3.2V e 4.2V)
-  const calculateBatteryPercent = (volts) => {
-    if (!volts) return 0;
-    const minV = 3.2;
-    const maxV = 4.2;
-    const pct = Math.round(((volts - minV) / (maxV - minV)) * 100);
-    return Math.max(0, Math.min(100, pct));
-  };
-
-  const batteryPct = calculateBatteryPercent(telemetry.batteryVoltage);
+  const history = status?.history || [];
+  const totalRegas = history.length;
+  const ultimaRega = history[0] ? history[0].rtcTime : 'Nenhuma rega registrada';
 
   return (
     <div className="container">
       {/* Header */}
       <header className="header">
-        <div className="header-title">
-          <Droplets className="w-8 h-8 text-emerald-400" style={{ color: '#10B981' }} size={32} />
-          <div>
-            <h1>Irrigação ESP32</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-              Servidor Serverless Vercel & Realtime Control
-            </p>
+        <div className="logo-section">
+          <div className="logo-icon">
+            <Droplets className="w-6 h-6 text-white" />
+          </div>
+          <div className="logo-title">
+            <h1>Registro de Irrigação Automatizada</h1>
+            <p>Monitoramento Solar & Módulo RTC DS3231 (ESP32)</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {status?.waterRequested ? (
-            <span className="badge badge-active">
-              <Activity size={14} /> Rega Solicitada ({status.durationSec}s)
-            </span>
-          ) : (
-            <span className="badge badge-online">
-              <CheckCircle2 size={14} /> Sistema Pronto
-            </span>
-          )}
-
-          <button
-            onClick={fetchStatus}
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid var(--panel-border)',
-              color: 'var(--text-secondary)',
-              padding: '0.4rem',
-              borderRadius: '0.5rem',
-              cursor: 'pointer'
-            }}
-            title="Atualizar agora"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+        <div className="status-badge">
+          <span className="pulse-dot"></span>
+          <span>ESP32 Solar Online (Canal 11)</span>
         </div>
       </header>
 
-      {/* Main Grid Layout */}
-      <div className="grid">
-        {/* Painel de Controle Principal (Regar Agora) */}
-        <div className="card col-4 action-box">
-          <div className="card-title" style={{ marginBottom: '1.5rem' }}>
-            <Power size={18} /> Ação Manual
+      {/* Cards de Estatísticas */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon">
+            <Droplets size={26} />
+          </div>
+          <div className="stat-info">
+            <div className="value">{totalRegas}</div>
+            <div className="label">Total de Regas Efetuadas</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon">
+            <Clock size={26} />
+          </div>
+          <div className="stat-info">
+            <div className="value" style={{ fontSize: '1.2rem' }}>{ultimaRega}</div>
+            <div className="label">Último Horário Ativado (RTC)</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon">
+            <Sun size={26} />
+          </div>
+          <div className="stat-info">
+            <div className="value">06:00 - 20:00</div>
+            <div className="label">Janela Diurna (A cada 2h)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Histórico de Irrigação */}
+      <div className="table-card">
+        <div className="table-header-bar">
+          <div className="table-title">
+            <Calendar className="text-emerald-400" size={22} />
+            <h2>Histórico de Ativações da Bomba</h2>
+            <span className="badge-count">{totalRegas} Registros</span>
+          </div>
+
+          <div className="action-buttons">
+            <button className="btn btn-secondary" onClick={fetchStatus} disabled={refreshing}>
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+              Atualizar
+            </button>
+            {history.length > 0 && (
+              <button className="btn btn-danger" onClick={handleClearHistory}>
+                <Trash2 size={16} />
+                Limpar Histórico
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="custom-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Horário Ativado no RTC</th>
+                <th>Duração da Rega</th>
+                <th>Modo de Ativação</th>
+                <th>Registro do Servidor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>
+                    <div className="empty-state">
+                      <Clock />
+                      <p>Nenhuma rega registrada ainda.</p>
+                      <span style={{ fontSize: '0.85rem' }}>
+                        As regas automáticas do RTC (06h às 20h) e manuais aparecerão nesta tabela.
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                history.map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td style={{ fontWeight: '600', color: '#94a3b8' }}>#{totalRegas - index}</td>
+                    <td style={{ fontWeight: '600', color: '#fff' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={15} className="text-emerald-400" />
+                        {item.rtcTime}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge-duration">
+                        <Zap size={14} />
+                        {item.durationSec} Segundos
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge-source">
+                        {item.source || 'RTC Agendado'}
+                      </span>
+                    </td>
+                    <td style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                      {new Date(item.serverTimestamp).toLocaleTimeString('pt-BR')}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Barra de Teste Manual */}
+        <div className="control-bar">
+          <div className="select-group">
+            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Testar Irrigação Manual:</span>
+            <select
+              className="select-input"
+              value={selectedDuration}
+              onChange={(e) => setSelectedDuration(Number(e.target.value))}
+            >
+              <option value={5}>5 Segundos</option>
+              <option value={10}>10 Segundos</option>
+              <option value={15}>15 Segundos</option>
+              <option value={30}>30 Segundos</option>
+            </select>
           </div>
 
           <button
-            onClick={handleToggleWater}
-            disabled={actionLoading}
-            className={`water-btn ${status?.waterRequested ? 'active' : ''}`}
+            className="btn btn-primary"
+            onClick={handleTriggerWatering}
+            disabled={actionLoading || status?.waterRequested}
           >
-            <Droplets size={36} />
-            <span>{status?.waterRequested ? 'CANCELAR' : 'REGAR AGORA'}</span>
+            <Play size={16} />
+            {status?.waterRequested ? 'Solicitação Pendente...' : 'Acionar Rega de Teste Agora'}
           </button>
-
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-            {status?.waterRequested
-              ? 'Aguardando ESP32 conectar e ligar a bomba d’água...'
-              : 'Clique para solicitar a rega do vaso'}
-          </p>
-
-          <div className="duration-selector">
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Duração:</span>
-            {[5, 10, 15, 30].map((sec) => (
-              <button
-                key={sec}
-                className={`duration-btn ${selectedDuration === sec ? 'selected' : ''}`}
-                onClick={() => setSelectedDuration(sec)}
-              >
-                {sec}s
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Métrica 1: Umidade do Solo */}
-        <div className="card col-4">
-          <div className="card-header">
-            <span className="card-title">
-              <Droplets size={18} style={{ color: 'var(--accent-emerald)' }} />
-              Umidade do Solo (Capacitivo v1.2)
-            </span>
-          </div>
-
-          <div className="metric-value">
-            {telemetry.soilMoisture}
-            <span className="metric-unit">%</span>
-          </div>
-
-          <div className="progress-bg">
-            <div
-              className="progress-fill fill-emerald"
-              style={{ width: `${Math.min(100, Math.max(0, telemetry.soilMoisture))}%` }}
-            ></div>
-          </div>
-
-          <div className="metric-footer">
-            {telemetry.soilMoisture < 30 ? (
-              <span style={{ color: 'var(--accent-rose)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <AlertCircle size={14} /> Solo Seco — Irrigação Recomendada
-              </span>
-            ) : telemetry.soilMoisture > 75 ? (
-              <span style={{ color: 'var(--accent-cyan)' }}>Solo Úmido — Boa hidratação</span>
-            ) : (
-              <span style={{ color: 'var(--accent-emerald)' }}>Umidade Ideal para o Vaso</span>
-            )}
-          </div>
-        </div>
-
-        {/* Métrica 2: Temperatura e Umidade DHT */}
-        <div className="card col-4">
-          <div className="card-header">
-            <span className="card-title">
-              <Thermometer size={18} style={{ color: 'var(--accent-amber)' }} />
-              Ambiente (DHT11/DHT22)
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyBetween: 'space-between', gap: '1.5rem' }}>
-            <div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Temperatura</p>
-              <div className="metric-value" style={{ fontSize: '1.8rem' }}>
-                {telemetry.temperature}
-                <span className="metric-unit">°C</span>
-              </div>
-            </div>
-
-            <div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Umidade do Ar</p>
-              <div className="metric-value" style={{ fontSize: '1.8rem' }}>
-                {telemetry.humidity}
-                <span className="metric-unit">%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="metric-footer" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Clock size={14} />
-            Última atualização: {formatTime(telemetry.updatedAt)}
-          </div>
-        </div>
-
-        {/* Métrica 3: Bateria & Painel Solar */}
-        <div className="card col-4">
-          <div className="card-header">
-            <span className="card-title">
-              <BatteryCharging size={18} style={{ color: 'var(--accent-cyan)' }} />
-              Energia Solar / Bateria 18650
-            </span>
-          </div>
-
-          <div className="metric-value">
-            {telemetry.batteryVoltage}
-            <span className="metric-unit">V ({batteryPct}%)</span>
-          </div>
-
-          <div className="progress-bg">
-            <div
-              className="progress-fill fill-cyan"
-              style={{ width: `${batteryPct}%` }}
-            ></div>
-          </div>
-
-          <div className="metric-footer">
-            Alimentação via Painel Solar + Shield 4 Baterias 18650
-          </div>
-        </div>
-
-        {/* Histórico de Logs */}
-        <div className="card col-8">
-          <div className="card-header">
-            <span className="card-title">
-              <Activity size={18} /> Log de Atividades do Sistema
-            </span>
-          </div>
-
-          <div className="log-container">
-            {status?.logs?.length > 0 ? (
-              status.logs.map((log) => (
-                <div key={log.id} className="log-item">
-                  <span className="log-time">[{formatTime(log.timestamp)}]</span>
-                  <span className={`log-${log.type}`}>{log.message}</span>
-                </div>
-              ))
-            ) : (
-              <p style={{ color: 'var(--text-secondary)' }}>Nenhum log registrado ainda.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Guia de Integração com o ESP32 */}
-        <div className="card col-12">
-          <div className="card-header">
-            <span className="card-title">
-              🚀 Como Conectar o seu ESP32 neste Servidor Vercel
-            </span>
-          </div>
-
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            Seu projeto no Vercel fornece os seguintes endpoints HTTPS automáticos para comunicação:
-          </p>
-
-          <div className="guide-box">
-            <p><strong>1. Envio de Telemetria e Checagem de Rega (ESP32):</strong></p>
-            <p><code>POST https://projeto-esp32-irrigacao.vercel.app/api/esp32</code></p>
-            <p style={{ marginTop: '0.5rem' }}><strong>Payload JSON enviado pelo ESP32:</strong></p>
-            <code>{'{"soilMoisture": 45, "temperature": 25.4, "humidity": 60, "batteryVoltage": 4.1}'}</code>
-            <p style={{ marginTop: '0.5rem' }}><strong>Resposta JSON do Vercel para o ESP32:</strong></p>
-            <code>{'{"success": true, "waterRequested": true, "durationSec": 10}'}</code>
-          </div>
         </div>
       </div>
     </div>

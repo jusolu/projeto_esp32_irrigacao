@@ -1,63 +1,55 @@
 import serial
 import time
 
-# main.py que vai rodar no ESP32
-# NOTA: este arquivo é gravado linha a linha no ESP32 via serial
-
 MAIN_PY = """import network, time, urequests, machine
 
-led = machine.Pin(2, machine.Pin.OUT)
-led.value(0)
+# No ESP32 DevKit V1, o LED azul nativo é o GPIO 2 (const int LED_BUILTIN = 2)
+LED_BUILTIN = 2
+led = machine.Pin(LED_BUILTIN, machine.Pin.OUT)
+led.value(0) # Inicia DESLIGADO
 
-print("ESP32 MAIN.PY INICIADO")
+print("=== ESP32 DevKit V1 (LED_BUILTIN = 2) INICIADO ===")
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wlan.connect('AP104-2.4G', 'papagaio')
 
 while not wlan.isconnected():
-    led.value(1)
-    time.sleep(0.1)
-    led.value(0)
-    time.sleep(0.1)
+    time.sleep(0.2)
 
-ip = wlan.ifconfig()[0]
-print("CONECTADO! IP:", ip)
-
-for _ in range(5):
-    led.value(1)
-    time.sleep(0.1)
-    led.value(0)
-    time.sleep(0.1)
+print("🎉 WI-FI CONECTADO! IP:", wlan.ifconfig()[0])
+led.value(0)
 
 url = 'https://projeto-esp32-irrigacao.vercel.app/api/esp32'
 
 while True:
     try:
-        led.value(1)
-        time.sleep(0.06)
-        led.value(0)
-        payload = {'soilMoisture': 50, 'temperature': 25, 'humidity': 60, 'batteryVoltage': 4.1}
+        payload = {'soilMoisture': 50, 'temperature': 25.0, 'humidity': 60.0, 'batteryVoltage': 4.1}
         res = urequests.post(url, json=payload)
         data = res.json()
         res.close()
+        
         water = data.get('waterRequested', False)
         dur = data.get('durationSec', 10)
-        print("waterRequested:", water)
+        
         if water:
-            print("LIGANDO LED POR", dur, "s")
-            led.value(1)
-            time.sleep(dur)
-            led.value(0)
-            print("REGA CONCLUIDA")
+            print("💧 REGA SOLICITADA NO DASHBOARD! LIGANDO LED AZUL (GPIO 2) POR", dur, "s")
+            led.value(1) # LIGA LED AZUL EMBUTIDO (GPIO 2)
+            time.sleep(dur) # FICA LIGADO FIXO DURANTE A REGA
+            led.value(0) # DESLIGA LED AZUL
+            print("✅ REGA CONCLUIDA! Notificando Vercel...")
+            
             r2 = urequests.post(url, json={'waterCompleted': True})
             r2.close()
+        else:
+            led.value(0)
     except Exception as e:
-        print("ERRO:", e)
+        print("Erro loop:", e)
+        
     time.sleep(2)
 """
 
-def save_main():
-    print("=== GRAVANDO main.py CORRIGIDO NO ESP32 ===")
+def upload_devkit_v1_main():
+    print("=== GRAVANDO MAIN.PY COM LED_BUILTIN = 2 NO ESP32 DevKit V1 ===")
     ser = serial.Serial('COM14', 115200, timeout=2)
     ser.dtr = False
     ser.rts = False
@@ -70,32 +62,23 @@ def save_main():
     time.sleep(0.5)
     ser.read_all()
 
-    # Grava usando Raw REPL (modo mais confiável para arquivos multi-linha)
-    ser.write(b'\x01')  # Ctrl+A = Raw REPL
+    ser.write(b'\x01') # Raw REPL
     time.sleep(0.3)
 
-    code = f"f=open('main.py','w')\nf.write({repr(MAIN_PY)})\nf.close()\nprint('GRAVADO OK')\n"
+    code = f"f=open('main.py','w')\nf.write({repr(MAIN_PY)})\nf.close()\nprint('GRAVACAO OK')\n"
     ser.write(code.encode('utf-8'))
-    ser.write(b'\x04')  # Ctrl+D = executa
-    time.sleep(3)
+    ser.write(b'\x04')
+    time.sleep(2.5)
 
     out = ser.read_all().decode('utf-8', errors='ignore')
-    print("RESULTADO GRAVAÇÃO:", out)
+    print("Resultado da gravação:", "GRAVACAO OK" if "GRAVACAO OK" in out else out)
 
-    # Sai do Raw REPL e reinicia
-    ser.write(b'\x02')  # Ctrl+B = Normal REPL
+    ser.write(b'\x02')
     time.sleep(0.3)
     ser.write(b'import machine; machine.reset()\r\n')
-    time.sleep(2)
-
-    print("\n=== LENDO OUTPUT DO BOOT ===")
-    start = time.time()
-    while time.time() - start < 12:
-        line = ser.readline().decode('utf-8', errors='ignore')
-        if line.strip():
-            print(line.strip())
-
+    time.sleep(1)
     ser.close()
+    print("\nESP32 DevKit V1 reiniciado com LED_BUILTIN = 2 configurado!")
 
 if __name__ == '__main__':
-    save_main()
+    upload_devkit_v1_main()

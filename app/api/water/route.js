@@ -1,32 +1,28 @@
 import { NextResponse } from 'next/server';
-import { requestWatering, clearWateringRequest, getStateAsync } from '@/lib/state';
+import { requestWatering, clearWateringRequest, clearHistory } from '@/lib/state';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log('[WATER] POST recebido:', JSON.stringify(body));
-
-    let state;
-    if (body.action === 'stop') {
-      state = await clearWateringRequest();
-      return NextResponse.json({ success: true, message: 'Rega cancelada.', state });
+    
+    if (body.action === 'clear_history') {
+      await clearHistory();
+      return NextResponse.json({ success: true, message: 'Histórico limpo com sucesso.' });
     }
 
-    const duration = body.durationSec || body.duration || 10;
-    state = await requestWatering(duration);
-    console.log('[WATER] waterRequested agora:', state.waterRequested);
+    if (body.action === 'stop') {
+      const state = await clearWateringRequest();
+      return NextResponse.json({ success: true, state });
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: `Comando de rega enviado (${duration}s)!`,
-      state
-    });
+    const durationSec = Number(body.durationSec) || 15;
+    const state = await requestWatering(durationSec);
+    return NextResponse.json({ success: true, state });
   } catch (error) {
-    console.error('[WATER] Erro:', error.message);
     return NextResponse.json(
-      { success: false, error: 'Erro ao processar requisição de rega' },
+      { success: false, error: error.message },
       { status: 400 }
     );
   }

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStateAsync, updateTelemetry, clearWateringRequest } from '@/lib/state';
+import { getStateAsync, recordWateringEvent } from '@/lib/state';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/esp32 -> O ESP32 consulta se deve regar
+// GET /api/esp32 -> ESP32 consulta se há acionamento manual pendente
 export async function GET() {
   const state = await getStateAsync();
   return NextResponse.json({
@@ -13,35 +13,35 @@ export async function GET() {
   });
 }
 
-// POST /api/esp32 -> ESP32 envia telemetria e recebe instrução de rega
+// POST /api/esp32 -> ESP32 envia a confirmação e horário da rega realizada
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log('[ESP32] POST recebido:', JSON.stringify(body));
+    console.log('[API ESP32] POST recebido:', JSON.stringify(body));
 
-    let state;
-    if (body.waterCompleted) {
-      console.log('[ESP32] Rega concluída - limpando request');
-      state = await clearWateringRequest();
-    } else {
-      state = await updateTelemetry({
-        soilMoisture: body.soilMoisture,
-        temperature: body.temperature,
-        humidity: body.humidity,
-        batteryVoltage: body.batteryVoltage,
-        rawAnalog: body.rawAnalog
+    if (body.waterCompleted || body.durationSec) {
+      const history = await recordWateringEvent({
+        rtcTime: body.rtcTime || body.timestamp,
+        durationSec: body.durationSec || 15,
+        source: body.source || (body.cycle ? `Ciclo #${body.cycle}` : 'RTC Agendado')
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Evento de irrigação gravado com sucesso no histórico!',
+        totalEvents: history.length,
+        waterRequested: false
       });
     }
 
-    console.log('[ESP32] Respondendo waterRequested:', state.waterRequested);
+    const state = await getStateAsync();
     return NextResponse.json({
       success: true,
       waterRequested: state.waterRequested,
-      durationSec: state.durationSec,
-      timestamp: new Date().toISOString()
+      durationSec: state.durationSec
     });
   } catch (error) {
-    console.error('[ESP32] Erro:', error.message);
+    console.error('[API ESP32] Erro no processamento:', error.message);
     return NextResponse.json(
       { success: false, error: 'Formato de JSON inválido' },
       { status: 400 }
