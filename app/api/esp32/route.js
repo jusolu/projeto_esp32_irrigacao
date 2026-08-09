@@ -23,8 +23,8 @@ export async function POST(request) {
         rtcTime: body.rtcTime || body.timestamp,
         durationSec: body.durationSec || 15,
         source: body.source || 'RTC Agendado',
-        batteryVoltage: body.batteryVoltage || 4.14,
-        batteryPct: body.batteryPct || 94
+        batteryVoltage: body.batteryVoltage ?? 4.14,
+        batteryPct: body.batteryPct ?? 100
       });
 
       return NextResponse.json({
