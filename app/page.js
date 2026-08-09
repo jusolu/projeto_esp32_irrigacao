@@ -38,10 +38,20 @@ export default function HistoryDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const getBateriaStr = (item) => {
+    if (!item) return '3.70V (50%)';
+    const v = Number(item.batteryVoltage) || 3.7;
+    const calcPct = Math.min(100, Math.max(0, Math.round(((v - 3.20) / (4.20 - 3.20)) * 100)));
+    const pct = (item.batteryPct !== undefined && item.batteryPct !== null && item.batteryPct !== 94)
+      ? item.batteryPct
+      : calcPct;
+    return `${v.toFixed(2)}V (${pct}%)`;
+  };
+
   const history = status?.history || [];
   const totalRegas = history.length;
   const ultimaRega = history[0] ? history[0].rtcTime : 'Aguardando primeira rega';
-  const ultimaBateria = history[0] ? `${history[0].batteryVoltage || 4.14}V (${history[0].batteryPct || 94}%)` : '4.14V (94%)';
+  const ultimaBateria = getBateriaStr(history[0]);
 
   return (
     <div className="container">
@@ -155,7 +165,7 @@ export default function HistoryDashboard() {
                     </td>
                     <td>
                       <span className="badge-source" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-                        🔋 {item.batteryVoltage || 4.14}V ({item.batteryPct || 94}%)
+                        🔋 {getBateriaStr(item)}
                       </span>
                     </td>
                     <td>
