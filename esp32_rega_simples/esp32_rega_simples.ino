@@ -8,8 +8,8 @@
       * LED Azul de Status ➔ GPIO 2
   - Regras de Funcionamento:
       * Horário: 100% Local pelo RTC DS3231 (Zero dependência de NTP ou internet)
-      * Grade Diurna Normal (11 Regas): 07:30, 09:00, 10:00, 11:00, 12:00, 13:00,
-                                         14:00, 15:00, 16:00, 17:00, 18:00
+      * Grade Diurna Normal (12 Regas): 07:30, 09:00, 10:00, 11:00, 12:00, 13:00,
+                                         14:00, 15:00, 16:00, 17:00, 18:00, 19:30
       * Duração da Rega: FIXO EM 45 SEGUNDOS (60s na rega inicial no reset/boot)
       * Modo Emergência (Sem RTC / Falha): Rega a cada 8 HORAS (28.800 segundos)
       * Janela OTA: 5 minutos de Wi-Fi aberto após o boot para atualizações sem fio
@@ -318,9 +318,9 @@ void executarJanelaOTA(int segundosLimit) {
   Serial.println("=======================================================");
 }
 
-// 11 Horários de Rega Diurnos (minutos desde a meia-noite):
-// 07:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00
-const int HORARIOS_REGA[] = { 450, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080 };
+// 12 Horários de Rega (minutos desde a meia-noite):
+// 07:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:30
+const int HORARIOS_REGA[] = { 450, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1170 };
 const int QTD_HORARIOS = sizeof(HORARIOS_REGA) / sizeof(HORARIOS_REGA[0]);
 
 uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
@@ -338,7 +338,7 @@ uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
   if (proximoMinutos != -1) {
     minutosAteProximo = proximoMinutos - atualMinutos;
   } else {
-    // Passou das 18:00. O próximo é 07:30 da manhã seguinte
+    // Passou das 19:30. O próximo é 07:30 da manhã seguinte
     minutosAteProximo = (1440 - atualMinutos) + HORARIOS_REGA[0];
   }
 
