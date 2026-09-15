@@ -75,11 +75,31 @@ void setRTCDateTime(uint8_t sec, uint8_t min, uint8_t hour, uint8_t day, uint8_t
   Wire.endTransmission();
 }
 
+void ajustarRTCDataCompilacao() {
+  const char* meses[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  char mesStr[4];
+  int dia = 1, ano = 2026, hora = 0, min = 0, seg = 0;
+  sscanf(__DATE__, "%s %d %d", mesStr, &dia, &ano);
+  sscanf(__TIME__, "%d:%d:%d", &hora, &min, &seg);
+  
+  int mes = 1;
+  for (int i = 0; i < 12; i++) {
+    if (strncmp(mesStr, meses[i], 3) == 0) {
+      mes = i + 1;
+      break;
+    }
+  }
+  setRTCDateTime(seg, min, hora, dia, mes, ano);
+  Serial.printf("⏰ [RTC] Relógio calibrado com data/hora de compilação: %02d/%02d/%04d %02d:%02d:%02d\n",
+                dia, mes, ano, hora, min, seg);
+}
+
 bool lerHoraRTC(int &seg, int &min, int &hora, int &dia, int &mes, int &ano) {
   Wire.beginTransmission(RTC_I2C_ADDRESS);
   Wire.write(0x00);
   byte error = Wire.endTransmission();
   if (error != 0) {
+    Serial.printf("⚠️ [I2C] Nenhum dispositivo respondeu no endereço 0x%02X (Erro I2C: %d)\n", RTC_I2C_ADDRESS, error);
     return false;
   }
 
@@ -88,13 +108,32 @@ bool lerHoraRTC(int &seg, int &min, int &hora, int &dia, int &mes, int &ano) {
     seg  = bcdToDec(Wire.read() & 0x7F);
     min  = bcdToDec(Wire.read());
     hora = bcdToDec(Wire.read() & 0x3F);
-    Wire.read();
+    Wire.read(); // dia da semana
     dia  = bcdToDec(Wire.read());
     mes  = bcdToDec(Wire.read());
     ano  = bcdToDec(Wire.read()) + 2000;
     
     if (ano >= 2026 && ano <= 2035 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) {
       return true;
+    } else {
+      Serial.printf("⚠️ [RTC] Módulo detectado na I2C sem hora gravada (%02d/%02d/%04d). Calibrando automaticamente...\n", dia, mes, ano);
+      ajustarRTCDataCompilacao();
+      delay(50);
+      Wire.beginTransmission(RTC_I2C_ADDRESS);
+      Wire.write(0x00);
+      Wire.endTransmission();
+      Wire.requestFrom(RTC_I2C_ADDRESS, 7);
+      if (Wire.available() >= 7) {
+        seg  = bcdToDec(Wire.read() & 0x7F);
+        min  = bcdToDec(Wire.read());
+        hora = bcdToDec(Wire.read() & 0x3F);
+        Wire.read();
+        dia  = bcdToDec(Wire.read());
+        mes  = bcdToDec(Wire.read());
+        ano  = bcdToDec(Wire.read()) + 2000;
+        return (ano >= 2026 && ano <= 2035);
+      }
+      return false;
     }
   }
   return false;
@@ -350,11 +389,12 @@ void setup() {
   int seg = 0, min = 0, hora = 0, dia = 0, mes = 0, ano = 0;
   char timeBuffer[30] = "Hora Invalida";
   bool rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
+
   if (rtcValido) {
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
     Serial.printf("⏰ RTC DS3231 Lido com Sucesso: %s\n", timeBuffer);
   } else {
-    Serial.println("⚠️ RTC DS3231 não respondeu no barramento I2C.");
+    Serial.println("⚠️ Nenhum módulo RTC DS3231 respondeu no circuito.");
   }
 
   // Duração da rega fixa: 60s (1 min) no Boot/Reset ou 45s padrão em todas as regas normais
