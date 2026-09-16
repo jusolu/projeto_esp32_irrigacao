@@ -1,56 +1,46 @@
-/*
-  =============================================================================
-  SCANNER I2C PARA ESP32 (SDA = GPIO 18 | SCL = GPIO 19)
-  =============================================================================
-*/
-
 #include <Wire.h>
 
-#define I2C_SDA 18
-#define I2C_SCL 19
+const int gpios[] = {0, 2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33};
+const int totalPins = sizeof(gpios) / sizeof(gpios[0]);
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  Serial.println("\n=== VARREDURA COMPLETA DE TODOS OS PINOS DO ESP32 ===");
 
-  Serial.println("\n=======================================================");
-  Serial.println("         ESP32 - SCANNER DE DISPOSITIVOS I2C");
-  Serial.println("=======================================================");
-  Serial.printf("Configuração dos Pinos I2C: SDA = GPIO %d | SCL = GPIO %d\n", I2C_SDA, I2C_SCL);
-  Serial.println("-------------------------------------------------------\n");
+  bool encontrouRTC = false;
 
-  Wire.begin(I2C_SDA, I2C_SCL);
-}
+  for (int i = 0; i < totalPins; i++) {
+    for (int j = 0; j < totalPins; j++) {
+      if (i == j) continue;
+      int sda = gpios[i];
+      int scl = gpios[j];
 
-void loop() {
-  byte error, address;
-  int nDevices = 0;
+      Wire.end();
+      Wire.begin(sda, scl);
+      Wire.setTimeOut(20);
 
-  Serial.println("Escaneando barramento I2C...");
-
-  for (address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-
-    if (error == 0) {
-      Serial.printf("  -> Dispositivo I2C encontrado no endereço 0x%02X", address);
-      if (address == 0x68) {
-        Serial.print(" (Módulo RTC DS3231 / DS1307)");
-      } else if (address == 0x57) {
-        Serial.print(" (Memória EEPROM AT24C32 do RTC)");
+      // Testa se o RTC (0x68) ou a EEPROM do RTC (0x57) responde
+      Wire.beginTransmission(0x68);
+      if (Wire.endTransmission() == 0) {
+        Serial.printf("🎉 ENCONTRADO RTC DS3231 (0x68) em SDA=GPIO %d e SCL=GPIO %d!\n", sda, scl);
+        encontrouRTC = true;
       }
-      Serial.println();
-      nDevices++;
-    } else if (error == 4) {
-      Serial.printf("  -> Erro desconhecido no endereço 0x%02X\n", address);
+      Wire.beginTransmission(0x57);
+      if (Wire.endTransmission() == 0) {
+        Serial.printf("🎉 ENCONTRADA EEPROM (0x57) em SDA=GPIO %d e SCL=GPIO %d!\n", sda, scl);
+        encontrouRTC = true;
+      }
     }
   }
 
-  if (nDevices == 0) {
-    Serial.println("Nenhum dispositivo I2C encontrado. Verifique os fios SDA (GPIO 18) e SCL (GPIO 19).\n");
+  if (!encontrouRTC) {
+    Serial.println("❌ NENHUM RTC DS3231 (0x68) ou EEPROM (0x57) foi encontrado em NENHUM pino do ESP32.");
   } else {
-    Serial.printf("Busca concluída. %d dispositivo(s) encontrado(s).\n\n", nDevices);
+    Serial.println("✅ Varredura com sucesso!");
   }
+}
 
+void loop() {
   delay(5000);
 }

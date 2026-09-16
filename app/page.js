@@ -58,7 +58,7 @@ export default function HistoryDashboard() {
 
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          <span>Grade Diurna (12 Regas / 45s Padrão)</span>
+          <span>Grade Diurna (13 Regas - Teste 20:40 / 45s)</span>
         </div>
       </header>
 

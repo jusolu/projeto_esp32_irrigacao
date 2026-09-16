@@ -1,23 +1,31 @@
-/*
-  TESTE SIMPLES - LED GPIO 4
-  Liga o LED no GPIO 4 fixo por 5 segundos, depois pisca infinitamente.
-*/
+#include <Arduino.h>
+
+#define PIN_MOSFET 4
+#define LED_AZUL 2
+
 void setup() {
   Serial.begin(115200);
-  pinMode(4, OUTPUT);
+  delay(1000);
+  Serial.println("\n=================================================");
+  Serial.println("  TESTE DE CHAVEAMENTO DO MOSFET NO GPIO 4");
+  Serial.println("=================================================");
 
-  Serial.println("=== TESTE LED GPIO 4 ===");
-  Serial.println("Ligando LED no GPIO 4...");
-  digitalWrite(4, HIGH);
-  delay(5000);
-  Serial.println("Agora piscando a cada 500ms...");
+  pinMode(PIN_MOSFET, OUTPUT);
+  pinMode(LED_AZUL, OUTPUT);
+  digitalWrite(PIN_MOSFET, LOW);
+  digitalWrite(LED_AZUL, LOW);
 }
 
 void loop() {
-  digitalWrite(4, HIGH);
-  Serial.println("GPIO 4 -> HIGH (LED ON)");
-  delay(500);
-  digitalWrite(4, LOW);
-  Serial.println("GPIO 4 -> LOW  (LED OFF)");
-  delay(500);
+  // 1. DESLIGADO (LOW = 0V)
+  Serial.println("🔴 MOSFET DESLIGADO (LOW / 0V) -> Bomba deve estar TOTALMENTE PARADA por 6 segundos...");
+  digitalWrite(PIN_MOSFET, LOW);
+  digitalWrite(LED_AZUL, LOW);
+  delay(6000);
+
+  // 2. LIGADO (HIGH = 3.3V)
+  Serial.println("🟢 MOSFET LIGADO (HIGH / 3.3V) -> Bomba deve LIGAR por 3 segundos...");
+  digitalWrite(PIN_MOSFET, HIGH);
+  digitalWrite(LED_AZUL, HIGH);
+  delay(3000);
 }

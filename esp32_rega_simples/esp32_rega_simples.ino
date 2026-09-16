@@ -143,7 +143,7 @@ bool conectarWiFiRobusto() {
   Serial.println("🌐 Conectando à rede Wi-Fi para telemetria...");
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
-  WiFi.setTxPower(WIFI_POWER_17dBm);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int t = 0;
@@ -318,9 +318,9 @@ void executarJanelaOTA(int segundosLimit) {
   Serial.println("=======================================================");
 }
 
-// 12 Horários de Rega (minutos desde a meia-noite):
-// 07:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:30
-const int HORARIOS_REGA[] = { 450, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1170 };
+// 13 Horários de Rega (minutos desde a meia-noite):
+// 07:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:30, 20:40
+const int HORARIOS_REGA[] = { 450, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1170, 1240 };
 const int QTD_HORARIOS = sizeof(HORARIOS_REGA) / sizeof(HORARIOS_REGA[0]);
 
 uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
@@ -338,7 +338,7 @@ uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
   if (proximoMinutos != -1) {
     minutosAteProximo = proximoMinutos - atualMinutos;
   } else {
-    // Passou das 19:30. O próximo é 07:30 da manhã seguinte
+    // Passou das 20:40. O próximo é 07:30 da manhã seguinte
     minutosAteProximo = (1440 - atualMinutos) + HORARIOS_REGA[0];
   }
 
@@ -405,10 +405,13 @@ void setup() {
   executarRegaMOSFET(duracaoRegaSec, String(timeBuffer), motivo);
   cicloRega++;
 
-  // Janela OTA de 5 minutos no boot frio/reset
+  // Janela OTA rápida de 15 segundos no boot frio/reset para permitir testes pontuais imediatos
   if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-    executarJanelaOTA(300);
+    executarJanelaOTA(15);
   }
+
+  // Recalcula hora fresca do RTC para agendamento de sono com máxima precisão
+  rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
 
   // Calcula o sono exato até a próxima rega agendada
   uint64_t segundosSono = SEGUNDOS_EMERGENCIA_8H;
