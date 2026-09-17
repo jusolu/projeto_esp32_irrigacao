@@ -51,6 +51,14 @@ const char* WIFI_SSID       = "AP104-2.4G  "; // Dois espaços no final
 const char* WIFI_PASSWORD   = "papagaio";
 const char* VERCEL_POST_URL = "https://projeto-esp32-irrigacao.vercel.app/api/esp32";
 
+// Configurações de NTP (Sincronização de Hora Oficial via Internet)
+// Fuso Horário: GMT-4 (Hora do Brasil Central / Manaus / Cuiabá)
+const long GMT_OFFSET_SEC        = -4 * 3600;
+const int  DAYLIGHT_OFFSET_SEC   = 0;
+const char* NTP_SERVER_1         = "a.st1.ntp.br";
+const char* NTP_SERVER_2         = "pool.ntp.org";
+const char* NTP_SERVER_3         = "time.google.com";
+
 // Tempo de sono do Modo Emergência caso o RTC falhe: 8 Horas (28800 segundos)
 const uint64_t SEGUNDOS_EMERGENCIA_8H = 28800ULL;
 
@@ -73,6 +81,35 @@ void setRTCDateTime(uint8_t sec, uint8_t min, uint8_t hour, uint8_t day, uint8_t
   Wire.write(decToBcd(month));
   Wire.write(decToBcd(year - 2000));
   Wire.endTransmission();
+}
+
+bool sincronizarRTCComNTP() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+  Serial.println("🌐 [NTP] Consultando horário oficial na internet...");
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
+
+  struct tm timeinfo;
+  int tentativas = 0;
+  while (!getLocalTime(&timeinfo) && tentativas < 25) {
+    delay(150);
+    tentativas++;
+  }
+
+  if (getLocalTime(&timeinfo)) {
+    int ano = timeinfo.tm_year + 1900;
+    if (ano >= 2026 && ano <= 2035) {
+      setRTCDateTime(timeinfo.tm_sec, timeinfo.tm_min, timeinfo.tm_hour,
+                     timeinfo.tm_mday, timeinfo.tm_mon + 1, ano);
+      Serial.printf("⏰ [NTP ➔ RTC] Sucesso! Relógio DS3231 calibrado: %02d/%02d/%04d %02d:%02d:%02d\n",
+                    timeinfo.tm_mday, timeinfo.tm_mon + 1, ano,
+                    timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      return true;
+    }
+  }
+  Serial.println("⚠️ [NTP] Servidor NTP não respondeu a tempo.");
+  return false;
 }
 
 void ajustarRTCDataCompilacao() {
@@ -156,6 +193,7 @@ bool conectarWiFiRobusto() {
   if (WiFi.status() == WL_CONNECTED) {
     digitalWrite(LED_AZUL, HIGH);
     Serial.printf("✅ Wi-Fi Conectado com sucesso! (IP: %s)\n", WiFi.localIP().toString().c_str());
+    sincronizarRTCComNTP();
     return true;
   }
   
@@ -364,15 +402,10 @@ void setup() {
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  // Restaura hora persistente via RAM se o RTC tiver oscilado
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER && epochTimePersistente > 0 && ultimoSegundosSono > 0) {
-    epochTimePersistente += (uint32_t)ultimoSegundosSono;
-    time_t t_calc = (time_t)epochTimePersistente;
-    struct tm *tm_calc = localtime(&t_calc);
-    if (tm_calc != NULL) {
-      setRTCDateTime(tm_calc->tm_sec, tm_calc->tm_min, tm_calc->tm_hour, 
-                     tm_calc->tm_mday, tm_calc->tm_mon + 1, tm_calc->tm_year + 1900);
-    }
+  // Se for Boot Frio (Reset manual ou ligar na fonte), conecta imediatamente ao Wi-Fi para sincronizar o RTC via NTP
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    Serial.println("🚀 [BOOT FRIO] Conectando ao Wi-Fi para sincronizar relógio via NTP...");
+    conectarWiFiRobusto();
   }
 
   pinMode(LED_AZUL, OUTPUT);
@@ -389,6 +422,19 @@ void setup() {
   int seg = 0, min = 0, hora = 0, dia = 0, mes = 0, ano = 0;
   char timeBuffer[30] = "Hora Invalida";
   bool rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
+
+  // Fallback: se o RTC falhou mesmo após NTP e temos hora na RAM de sono anterior
+  if (!rtcValido && epochTimePersistente > 0 && ultimoSegundosSono > 0) {
+    Serial.println("⚠️ [RTC FALLBACK] Recuperando hora pela memória RAM...");
+    epochTimePersistente += (uint32_t)ultimoSegundosSono;
+    time_t t_calc = (time_t)epochTimePersistente;
+    struct tm *tm_calc = localtime(&t_calc);
+    if (tm_calc != NULL) {
+      setRTCDateTime(tm_calc->tm_sec, tm_calc->tm_min, tm_calc->tm_hour, 
+                     tm_calc->tm_mday, tm_calc->tm_mon + 1, tm_calc->tm_year + 1900);
+      rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
+    }
+  }
 
   if (rtcValido) {
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
