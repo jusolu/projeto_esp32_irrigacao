@@ -35,17 +35,17 @@
 #define RTC_I2C_ADDRESS 0x68
 
 #define LED_AZUL        2  // LED Azul embutido
-#define PIN_MOSFET      4  // Gate do MOSFET PWM (Active-HIGH)
+#define PIN_ACIONAMENTO 4  // Pino de sinal do Relé (GPIO 4)
+
+// Configuração do Nível Lógico do Módulo Relé:
+// - Se o seu relé for Active-HIGH (ou tiver jumper na posição 'H'): RELE_LIGADO = HIGH, RELE_DESLIGADO = LOW
+// - Se o seu relé for Active-LOW (ou tiver jumper na posição 'L'): RELE_LIGADO = LOW, RELE_DESLIGADO = HIGH
+const int RELE_LIGADO    = HIGH;
+const int RELE_DESLIGADO = LOW;
 
 // Configurações Fixas de Tempo de Rega
 #define DURACAO_REGA_PADRAO_SEC 45 // 45 segundos padrão em todas as regas normais
 #define DURACAO_REGA_BOOT_SEC   60 // 60 segundos (1 minuto) na rega inicial no reset/boot
-
-// Configuração do Periférico Hardware PWM (LEDC)
-#define PWM_CANAL     0  // Canal PWM 0
-#define PWM_FREQ   5000  // Frequência de 5 kHz (Silencioso para motores DC)
-#define PWM_RES       8  // Resolução de 8 bits (0 a 255)
-const int VELOCIDADE_BOMBA_PWM = 255; // 100% da potência
 
 const char* WIFI_SSID       = "AP104-2.4G  "; // Dois espaços no final
 const char* WIFI_PASSWORD   = "papagaio";
@@ -230,34 +230,25 @@ void reportarRegaParaVercel(int duracao, String horaFormatada, String motivo) {
   http.end();
 }
 
-// Execução da Rega com Partida Suave (Soft-Start PWM) no MOSFET
-void executarRegaMOSFET(int duracaoSec, String horaStr, String motivo) {
-  Serial.printf("💦 LIGANDO BOMBA VIA MOSFET PWM (GPIO 4 / %d%% VELOCIDADE) POR %d SEGUNDOS...\n", 
-                (VELOCIDADE_BOMBA_PWM * 100) / 255, duracaoSec);
+// Execução da Rega via Relé Digital
+void executarRega(int duracaoSec, String horaStr, String motivo) {
+  Serial.printf("💦 LIGANDO BOMBA VIA RELÉ (GPIO 4) POR %d SEGUNDOS...\n", duracaoSec);
 
-  // 1. Partida Suave (Soft-Start Ramp-Up) em 500ms
-  for (int pwm = 0; pwm <= VELOCIDADE_BOMBA_PWM; pwm += 15) {
-    ledcWrite(PWM_CANAL, pwm);
-    delay(30);
-  }
-  ledcWrite(PWM_CANAL, VELOCIDADE_BOMBA_PWM);
-  Serial.println("⚡ Bomba operando em velocidade total!");
+  // 1. Ativa o Relé
+  digitalWrite(PIN_ACIONAMENTO, RELE_LIGADO);
+  Serial.println("⚡ Relé ativado! Bomba operando.");
 
-  // 2. Mantém a bomba ligada piscando o LED Azul
+  // 2. Mantém o relé ligado piscando o LED Azul
   int totalPiscadas = (duracaoSec * 1000) / 250;
   for (int i = 0; i < totalPiscadas; i++) {
     digitalWrite(LED_AZUL, !digitalRead(LED_AZUL));
     delay(250);
   }
 
-  // 3. Desativação Suave do MOSFET (Ramp-Down)
-  for (int pwm = VELOCIDADE_BOMBA_PWM; pwm >= 0; pwm -= 25) {
-    ledcWrite(PWM_CANAL, pwm);
-    delay(20);
-  }
-  ledcWrite(PWM_CANAL, 0);
+  // 3. Desativação do Relé
+  digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
   digitalWrite(LED_AZUL, HIGH);
-  Serial.println("✅ Irrigação concluída! MOSFET desligado (0.00mA).");
+  Serial.println("✅ Irrigação concluída! Relé desarmado.");
 
   // 4. Conecta Wi-Fi e envia para a Vercel
   reportarRegaParaVercel(duracaoSec, horaStr, motivo);
@@ -411,9 +402,8 @@ void setup() {
   pinMode(LED_AZUL, OUTPUT);
   digitalWrite(LED_AZUL, HIGH);
 
-  ledcSetup(PWM_CANAL, PWM_FREQ, PWM_RES);
-  ledcAttachPin(PIN_MOSFET, PWM_CANAL);
-  ledcWrite(PWM_CANAL, 0);
+  pinMode(PIN_ACIONAMENTO, OUTPUT);
+  digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
 
   Serial.println("\n=======================================================");
   Serial.println("   SISTEMA DE IRRIGAÇÃO SOLAR - DEFINITIVO (45s FIXO)");
@@ -447,8 +437,8 @@ void setup() {
   int duracaoRegaSec = (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) ? DURACAO_REGA_BOOT_SEC : DURACAO_REGA_PADRAO_SEC;
   String motivo = (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) ? "Rega Inicial (Boot)" : ("Rega Agendada #" + String(cicloRega));
 
-  // Executa a rega via MOSFET e envia registro para a Vercel
-  executarRegaMOSFET(duracaoRegaSec, String(timeBuffer), motivo);
+  // Executa a rega via Relé e envia registro para a Vercel
+  executarRega(duracaoRegaSec, String(timeBuffer), motivo);
   cicloRega++;
 
   // Janela OTA rápida de 15 segundos no boot frio/reset para permitir testes pontuais imediatos
@@ -488,9 +478,8 @@ void setup() {
   ultimoSegundosSono = segundosSono;
 
   digitalWrite(LED_AZUL, LOW);
-  ledcWrite(PWM_CANAL, 0);
-  pinMode(PIN_MOSFET, OUTPUT);
-  digitalWrite(PIN_MOSFET, LOW);
+  pinMode(PIN_ACIONAMENTO, OUTPUT);
+  digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   Serial.flush();
