@@ -58,7 +58,7 @@ export default function HistoryDashboard() {
 
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          <span>Grade Diurna (13 Regas - Teste 20:40 / 45s)</span>
+          <span>Grade Diurna Oficial (13 Regas: 06:30 às 19:30 - 60s)</span>
         </div>
       </header>
 
@@ -89,7 +89,7 @@ export default function HistoryDashboard() {
             <Timer size={26} />
           </div>
           <div className="stat-info">
-            <div className="value">45s</div>
+            <div className="value">60s</div>
             <div className="label">Duração Fixa por Rega</div>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function HistoryDashboard() {
                       <Clock />
                       <p>Nenhuma rega registrada no histórico ainda.</p>
                       <span style={{ fontSize: '0.85rem' }}>
-                        O ESP32 executará automaticamente 45 segundos de rega nos 11 horários diurnos (07:30 às 18:00).
+                        O ESP32 executará automaticamente 60 segundos de rega nos 13 horários diurnos (06:30 às 19:30).
                       </span>
                     </div>
                   </td>
@@ -147,7 +147,7 @@ export default function HistoryDashboard() {
                     </td>
                     <td>
                       <span className="badge-duration">
-                        💦 {item.durationSec || 45}s
+                        💦 {item.durationSec || 60}s
                       </span>
                     </td>
                     <td>
@@ -157,7 +157,7 @@ export default function HistoryDashboard() {
                     </td>
                     <td>
                       <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem' }}>
-                        ⚡ MOSFET PWM (GPIO 4)
+                        ⚡ Relé Digital (GPIO 4)
                       </span>
                     </td>
                     <td className="server-time-col">

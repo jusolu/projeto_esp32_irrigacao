@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const config = await getConfigAsync();
   return NextResponse.json({
-    targetDurationSec: config.durationSec || 45,
+    targetDurationSec: config.durationSec || 60,
     serverTime: new Date().toISOString()
   });
 }
@@ -23,14 +23,14 @@ export async function POST(request) {
     if (body.waterCompleted || body.durationSec) {
       const history = await recordWateringEvent({
         rtcTime: body.rtcTime || body.timestamp,
-        durationSec: body.durationSec || config.durationSec || 45,
+        durationSec: body.durationSec || config.durationSec || 60,
         source: body.source || 'RTC Agendado'
       });
 
       return NextResponse.json({
         success: true,
         message: 'Evento gravado no histórico com sucesso!',
-        targetDurationSec: config.durationSec || 45,
+        targetDurationSec: config.durationSec || 60,
         totalEvents: history.length
       });
     }
@@ -38,7 +38,7 @@ export async function POST(request) {
     const state = await getStateAsync();
     return NextResponse.json({ 
       success: true, 
-      targetDurationSec: config.durationSec || 45,
+      targetDurationSec: config.durationSec || 60,
       state 
     });
   } catch (error) {

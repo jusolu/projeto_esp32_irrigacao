@@ -44,7 +44,7 @@ const int RELE_LIGADO    = HIGH;
 const int RELE_DESLIGADO = LOW;
 
 // Configurações Fixas de Tempo de Rega
-#define DURACAO_REGA_PADRAO_SEC 45 // 45 segundos padrão em todas as regas normais
+#define DURACAO_REGA_PADRAO_SEC 60 // 60 segundos (1 minuto) em todas as regas normais
 #define DURACAO_REGA_BOOT_SEC   60 // 60 segundos (1 minuto) na rega inicial no reset/boot
 
 const char* WIFI_SSID       = "AP104-2.4G  "; // Dois espaços no final
@@ -347,9 +347,9 @@ void executarJanelaOTA(int segundosLimit) {
   Serial.println("=======================================================");
 }
 
-// 13 Horários de Rega (minutos desde a meia-noite):
-// 07:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:30, 20:40
-const int HORARIOS_REGA[] = { 450, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1170, 1240 };
+// 13 Horários Oficiais de Rega (minutos desde a meia-noite):
+// 06:30, 08:00, 09:30, 10:30, 11:30, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:30
+const int HORARIOS_REGA[] = { 390, 480, 570, 630, 690, 720, 780, 840, 900, 960, 1020, 1080, 1170 };
 const int QTD_HORARIOS = sizeof(HORARIOS_REGA) / sizeof(HORARIOS_REGA[0]);
 
 uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
@@ -367,7 +367,7 @@ uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
   if (proximoMinutos != -1) {
     minutosAteProximo = proximoMinutos - atualMinutos;
   } else {
-    // Passou das 20:40. O próximo é 07:30 da manhã seguinte
+    // Passou das 19:30. O próximo é 06:30 da manhã seguinte
     minutosAteProximo = (1440 - atualMinutos) + HORARIOS_REGA[0];
   }
 
@@ -413,24 +413,49 @@ void setup() {
   char timeBuffer[30] = "Hora Invalida";
   bool rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
 
-  // Fallback: se o RTC falhou mesmo após NTP e temos hora na RAM de sono anterior
+  // Fallback 1: se o RTC físico não respondeu (erro I2C), usa a hora oficial já sincronizada via NTP
+  if (!rtcValido) {
+    struct tm ti;
+    if (getLocalTime(&ti)) {
+      int ano_ntp = ti.tm_year + 1900;
+      if (ano_ntp >= 2026 && ano_ntp <= 2035) {
+        seg  = ti.tm_sec;
+        min  = ti.tm_min;
+        hora = ti.tm_hour;
+        dia  = ti.tm_mday;
+        mes  = ti.tm_mon + 1;
+        ano  = ano_ntp;
+        rtcValido = true;
+        Serial.printf("🌐 [NTP ADOTADO] Relógio sincronizado com sucesso: %02d/%02d/%04d %02d:%02d:%02d\n",
+                      dia, mes, ano, hora, min, seg);
+        setRTCDateTime(seg, min, hora, dia, mes, ano);
+      }
+    }
+  }
+
+  // Fallback 2: se o RTC falhou mesmo após NTP e temos hora na RAM de sono anterior
   if (!rtcValido && epochTimePersistente > 0 && ultimoSegundosSono > 0) {
     Serial.println("⚠️ [RTC FALLBACK] Recuperando hora pela memória RAM...");
     epochTimePersistente += (uint32_t)ultimoSegundosSono;
     time_t t_calc = (time_t)epochTimePersistente;
     struct tm *tm_calc = localtime(&t_calc);
     if (tm_calc != NULL) {
-      setRTCDateTime(tm_calc->tm_sec, tm_calc->tm_min, tm_calc->tm_hour, 
-                     tm_calc->tm_mday, tm_calc->tm_mon + 1, tm_calc->tm_year + 1900);
-      rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
+      seg  = tm_calc->tm_sec;
+      min  = tm_calc->tm_min;
+      hora = tm_calc->tm_hour;
+      dia  = tm_calc->tm_mday;
+      mes  = tm_calc->tm_mon + 1;
+      ano  = tm_calc->tm_year + 1900;
+      rtcValido = true;
+      setRTCDateTime(seg, min, hora, dia, mes, ano);
     }
   }
 
   if (rtcValido) {
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
-    Serial.printf("⏰ RTC DS3231 Lido com Sucesso: %s\n", timeBuffer);
+    Serial.printf("⏰ Horário Atual Validado: %s\n", timeBuffer);
   } else {
-    Serial.println("⚠️ Nenhum módulo RTC DS3231 respondeu no circuito.");
+    Serial.println("⚠️ Nenhum módulo RTC DS3231 ou NTP respondeu no circuito.");
   }
 
   // Duração da rega fixa: 60s (1 min) no Boot/Reset ou 45s padrão em todas as regas normais
@@ -446,8 +471,21 @@ void setup() {
     executarJanelaOTA(15);
   }
 
-  // Recalcula hora fresca do RTC para agendamento de sono com máxima precisão
-  rtcValido = lerHoraRTC(seg, min, hora, dia, mes, ano);
+  // Recalcula hora fresca para agendamento de sono com máxima precisão
+  if (!lerHoraRTC(seg, min, hora, dia, mes, ano)) {
+    struct tm ti;
+    if (getLocalTime(&ti)) {
+      seg  = ti.tm_sec;
+      min  = ti.tm_min;
+      hora = ti.tm_hour;
+      dia  = ti.tm_mday;
+      mes  = ti.tm_mon + 1;
+      ano  = ti.tm_year + 1900;
+      rtcValido = true;
+    }
+  } else {
+    rtcValido = true;
+  }
 
   // Calcula o sono exato até a próxima rega agendada
   uint64_t segundosSono = SEGUNDOS_EMERGENCIA_8H;
