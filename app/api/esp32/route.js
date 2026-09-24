@@ -24,7 +24,8 @@ export async function POST(request) {
       const history = await recordWateringEvent({
         rtcTime: body.rtcTime || body.timestamp,
         durationSec: body.durationSec || config.durationSec || 60,
-        source: body.source || 'RTC Agendado'
+        source: body.source || 'RTC Agendado',
+        actuators: body.actuators || 'Bomba (GPIO 4) + Válvula (GPIO 16)'
       });
 
       return NextResponse.json({

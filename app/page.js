@@ -157,7 +157,7 @@ export default function HistoryDashboard() {
                     </td>
                     <td>
                       <span style={{ color: '#10b981', fontWeight: 600, fontSize: '0.85rem' }}>
-                        ⚡ Relé Digital (GPIO 4)
+                        ⚡ {item.actuators || 'Bomba (GPIO 4) + Válvula (GPIO 16)'}
                       </span>
                     </td>
                     <td className="server-time-col">
