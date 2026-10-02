@@ -58,7 +58,7 @@ export default function HistoryDashboard() {
 
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          <span>Grade Diurna Oficial (13 Regas: 06:30 às 19:30 - 60s)</span>
+          <span>Grade Diurna Oficial (13 Regas: 06:30 às 18:00 - 3 Setores)</span>
         </div>
       </header>
 
@@ -89,8 +89,8 @@ export default function HistoryDashboard() {
             <Timer size={26} />
           </div>
           <div className="stat-info">
-            <div className="value">60s</div>
-            <div className="label">Duração Fixa por Rega</div>
+            <div className="value">60s / setor</div>
+            <div className="label">Duração das Regas Agendadas</div>
           </div>
         </div>
       </div>
