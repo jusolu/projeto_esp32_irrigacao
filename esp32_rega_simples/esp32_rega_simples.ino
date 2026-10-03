@@ -1,19 +1,20 @@
 /*
   =============================================================================
-  SISTEMA DE IRRIGAÇÃO SOLAR AUTOMATIZADO - DEFINITIVO
+  SISTEMA DE IRRIGAÇÃO AUTOMATIZADO - 1 RELÉ (GPIO 32) + RTC DS3231
   =============================================================================
   - Hardware:
-      * Módulo MOSFET PWM (Gate / Sinal) ➔ GPIO 4 (Active-HIGH / Soft-Start)
-      * Módulo RTC DS3231 ➔ I2C (SDA=GPIO 21, SCL=GPIO 22) - Hora local gravada
+      * Módulo Relé (Bomba d'água) ➔ GPIO 32 (Active-HIGH)
+      * Módulo RTC DS3231 ➔ I2C (SDA=GPIO 21, SCL=GPIO 22) - Hora local
       * LED Azul de Status ➔ GPIO 2
   - Regras de Funcionamento:
-      * Horário: 100% Local pelo RTC DS3231 (Zero dependência de NTP ou internet)
-      * Grade Diurna Normal (12 Regas): 07:30, 09:00, 10:00, 11:00, 12:00, 13:00,
-                                         14:00, 15:00, 16:00, 17:00, 18:00, 19:30
-      * Duração da Rega: FIXO EM 45 SEGUNDOS (60s na rega inicial no reset/boot)
-      * Modo Emergência (Sem RTC / Falha): Rega a cada 8 HORAS (28.800 segundos)
-      * Janela OTA: 5 minutos de Wi-Fi aberto após o boot para atualizações sem fio
-      * Deep Sleep Ultra-Econômico: Rádio Wi-Fi desliga no sono (consumo < 15mA)
+      * Horário: 100% Local pelo RTC DS3231
+      * Grade Diurna Oficial (13 Regas):
+          06:30, 07:30, 08:30, 09:00, 10:00, 11:00, 12:00, 13:00,
+          14:00, 15:00, 16:00, 17:00, 18:00
+      * Duração da Rega:
+          - 60 segundos (1 minuto) em todas as regas agendadas da grade
+          - 15 segundos na rega inicial de ativação/boot
+      * Standby Ativo contínuo monitorando o RTC (sem queda da porta USB)
   =============================================================================
 */
 
@@ -34,18 +35,16 @@
 #define I2C_SCL 22
 #define RTC_I2C_ADDRESS 0x68
 
-#define LED_AZUL        2  // LED Azul embutido
-#define PIN_ACIONAMENTO 4  // Pino de sinal do Relé (GPIO 4)
+#define LED_AZUL        2   // LED Azul embutido
+#define PIN_ACIONAMENTO 32  // Pino de sinal do Relé (GPIO 32)
 
-// Configuração do Nível Lógico do Módulo Relé:
-// - Se o seu relé for Active-HIGH (ou tiver jumper na posição 'H'): RELE_LIGADO = HIGH, RELE_DESLIGADO = LOW
-// - Se o seu relé for Active-LOW (ou tiver jumper na posição 'L'): RELE_LIGADO = LOW, RELE_DESLIGADO = HIGH
+// Configuração do Nível Lógico do Módulo Relé (Active-HIGH: HIGH = Liga / LOW = Desliga)
 const int RELE_LIGADO    = HIGH;
 const int RELE_DESLIGADO = LOW;
 
-// Configurações Fixas de Tempo de Rega
-#define DURACAO_REGA_PADRAO_SEC 60 // 60 segundos (1 minuto) em todas as regas normais
-#define DURACAO_REGA_BOOT_SEC   60 // 60 segundos (1 minuto) na rega inicial no reset/boot
+// Configurações de Duração da Rega
+#define DURACAO_REGA_PADRAO_SEC 60 // 60 segundos (1 minuto) nas regas agendadas
+#define DURACAO_REGA_BOOT_SEC   15 // 15 segundos na rega inicial de ativação/boot
 
 const char* WIFI_SSID       = "AP104-2.4G  "; // Dois espaços no final
 const char* WIFI_PASSWORD   = "papagaio";
@@ -287,7 +286,7 @@ void reportarRegaParaVercel(int duracao, String horaFormatada, String motivo) {
 
 // Execução da Rega via Relé Digital
 void executarRega(int duracaoSec, String horaStr, String motivo) {
-  Serial.printf("💦 LIGANDO BOMBA VIA RELÉ (GPIO 4) POR %d SEGUNDOS...\n", duracaoSec);
+  Serial.printf("💦 LIGANDO BOMBA VIA RELÉ (GPIO %d) POR %d SEGUNDOS (%s)...\n", PIN_ACIONAMENTO, duracaoSec, motivo.c_str());
 
   // 1. Ativa o Relé
   digitalWrite(PIN_ACIONAMENTO, RELE_LIGADO);
@@ -302,11 +301,11 @@ void executarRega(int duracaoSec, String horaStr, String motivo) {
 
   // 3. Desativação do Relé
   digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
-  digitalWrite(LED_AZUL, HIGH);
+  digitalWrite(LED_AZUL, LOW);
   Serial.println("✅ Irrigação concluída! Relé desarmado.");
 
-  // 4. Conecta Wi-Fi e envia para a Vercel
-  reportarRegaParaVercel(duracaoSec, horaStr, motivo);
+  // 4. Telemetria Vercel desativada na bancada para evitar pico do rádio Wi-Fi na porta USB
+  // reportarRegaParaVercel(duracaoSec, horaStr, motivo);
 }
 
 void executarJanelaOTA(int segundosLimit) {
@@ -402,9 +401,9 @@ void executarJanelaOTA(int segundosLimit) {
   Serial.println("=======================================================");
 }
 
-// 13 Horários Oficiais de Rega (minutos desde a meia-noite):
-// 06:30, 08:30, 09:30, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00
-const int HORARIOS_REGA[] = { 390, 510, 570, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140 };
+// 13 Horários Oficiais de Rega Diurna (minutos desde a meia-noite):
+// 06:30, 07:30, 08:30, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00
+const int HORARIOS_REGA[] = { 390, 450, 510, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080 };
 const int QTD_HORARIOS = sizeof(HORARIOS_REGA) / sizeof(HORARIOS_REGA[0]);
 
 uint64_t calcularSegundosParaProximaRega(int hora, int min, int seg) {
@@ -437,7 +436,7 @@ void setup() {
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   WiFi.mode(WIFI_OFF);
   btStop();
-  gpio_hold_dis(GPIO_NUM_4);
+  gpio_hold_dis((gpio_num_t)PIN_ACIONAMENTO);
 
   Serial.begin(115200);
   delay(200);
@@ -454,7 +453,7 @@ void setup() {
   digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
 
   Serial.println("\n=======================================================");
-  Serial.println("   SISTEMA DE IRRIGAÇÃO SOLAR - DEFINITIVO (45s FIXO)");
+  Serial.println("  SISTEMA DE IRRIGAÇÃO - 1 RELÉ (GPIO 32) + RTC DS3231");
   Serial.println("=======================================================");
 
   int seg = 0, min = 0, hora = 0, dia = 0, mes = 0, ano = 0;
@@ -514,55 +513,7 @@ void setup() {
   executarRega(duracaoRegaSec, String(timeBuffer), motivo);
   cicloRega++;
 
-  // Janela OTA rápida de 15 segundos no boot frio/reset para permitir testes pontuais imediatos
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-    executarJanelaOTA(15);
-  }
-
-  // Recalcula hora fresca para agendamento de sono com máxima precisão
-  if (!lerHoraRTC(seg, min, hora, dia, mes, ano)) {
-    struct tm ti;
-    if (getLocalTime(&ti)) {
-      seg  = ti.tm_sec;
-      min  = ti.tm_min;
-      hora = ti.tm_hour;
-      dia  = ti.tm_mday;
-      mes  = ti.tm_mon + 1;
-      ano  = ti.tm_year + 1900;
-      rtcValido = true;
-    }
-  } else {
-    rtcValido = true;
-  }
-
-  // Calcula o sono exato até a próxima rega agendada
-  uint64_t segundosSono = SEGUNDOS_EMERGENCIA_8H;
-  if (rtcValido) {
-    segundosSono = calcularSegundosParaProximaRega(hora, min, seg);
-    int horasSono = segundosSono / 3600;
-    int minutosRestantes = (segundosSono % 3600) / 60;
-    Serial.printf("🌿 [AGENDAMENTO NORMAL] Próxima rega em %02d:%02d (%llu seg)...\n", 
-                  horasSono, minutosRestantes, segundosSono);
-
-    struct tm tm_sleep;
-    tm_sleep.tm_sec = seg;
-    tm_sleep.tm_min = min;
-    tm_sleep.tm_hour = hora;
-    tm_sleep.tm_mday = dia;
-    tm_sleep.tm_mon = mes - 1;
-    tm_sleep.tm_year = ano - 1900;
-    tm_sleep.tm_isdst = -1;
-    time_t t_sleep = mktime(&tm_sleep);
-    if (t_sleep != -1) {
-      epochTimePersistente = (uint32_t)t_sleep;
-    }
-  } else {
-    segundosSono = SEGUNDOS_EMERGENCIA_8H; // 8 HORAS de Emergência
-    Serial.printf("⚠️ [MODO DE EMERGÊNCIA] Relógio sem hora. Próxima rega em 8 HORAS (%llu seg)!\n", segundosSono);
-  }
-
-  ultimoSegundosSono = segundosSono;
-
+  // Garante que o relé fique DEFINITIVAMENTE DESLIGADO (nível LOW no D32)
   digitalWrite(LED_AZUL, LOW);
   pinMode(PIN_ACIONAMENTO, OUTPUT);
   digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
@@ -570,13 +521,46 @@ void setup() {
   WiFi.mode(WIFI_OFF);
   Serial.flush();
 
-  gpio_hold_en(GPIO_NUM_4);
-  gpio_deep_sleep_hold_en();
-
-  esp_sleep_enable_timer_wakeup(segundosSono * 1000000ULL);
-  esp_deep_sleep_start();
+  Serial.println("\n=======================================================");
+  Serial.println("  💤 CICLO INICIAL CONCLUÍDO - RELÉ DESLIGADO (D32 / LOW)");
+  Serial.println("  ESP32 em Standby Ativo monitorando o RTC para próximas regas.");
+  Serial.println("=======================================================");
 }
 
+unsigned long ultimoCheckRTC = 0;
+int ultimoMinutoRegado = -1;
+
 void loop() {
-  // Deep Sleep
+  // Garante continuamente que o relé permaneça desligado
+  digitalWrite(PIN_ACIONAMENTO, RELE_DESLIGADO);
+
+  // Verifica horário a cada 1 segundo
+  if (millis() - ultimoCheckRTC >= 1000) {
+    ultimoCheckRTC = millis();
+
+    int seg = 0, min = 0, hora = 0, dia = 0, mes = 0, ano = 0;
+    if (lerHoraRTC(seg, min, hora, dia, mes, ano)) {
+      int atualMinutos = hora * 60 + min;
+
+      // Imprime status a cada 30 segundos no terminal
+      if (seg % 30 == 0) {
+        Serial.printf("⏱️ [RTC] %02d/%02d/%04d %02d:%02d:%02d | Relé D32: OFF\n", 
+                      dia, mes, ano, hora, min, seg);
+      }
+
+      // Verifica se o minuto atual coincide com algum horário da grade oficial
+      for (int i = 0; i < QTD_HORARIOS; i++) {
+        if (HORARIOS_REGA[i] == atualMinutos && atualMinutos != ultimoMinutoRegado) {
+          ultimoMinutoRegado = atualMinutos;
+          char timeBuffer[30];
+          snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
+          Serial.printf("\n⏰ Horário da grade atingido (%02d:%02d)! Iniciando rega agendada #%d (60s)...\n", hora, min, cicloRega);
+          executarRega(DURACAO_REGA_PADRAO_SEC, String(timeBuffer), "Rega Agendada #" + String(cicloRega));
+          cicloRega++;
+          break;
+        }
+      }
+    }
+  }
+  delay(100);
 }
